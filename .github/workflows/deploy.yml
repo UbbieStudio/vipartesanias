@@ -57,23 +57,29 @@ jobs:
             export PHP_BIN="/opt/plesk/php/8.2/bin/php"
             cd /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/
             
-            # 1. Update DB
+            # 1. Database Check/Update
             mysql -u vipartes_admin -p'${{ secrets.DB_PASS }}' vipartes_ps -e "UPDATE ps_shop_url SET domain='vipartesanias.ubbie.studio', domain_ssl='vipartesanias.ubbie.studio', physical_uri='/'; UPDATE ps_configuration SET value='vipartesanias.ubbie.studio' WHERE name='PS_SHOP_DOMAIN' OR name='PS_SHOP_DOMAIN_SSL';"
             
-            # 2. Setup Composer
+            # 2. Setup Composer Binary
             rm -f composer.phar
             $PHP_BIN -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
             $PHP_BIN composer-setup.php
             rm composer-setup.php
             
-            # 3. Dump Autoloader (Don't 'install' dependencies, just map existing classes)
+            # 3. Generate Autoloader with correct mappings
             rm -rf vendor
-            $PHP_BIN composer.phar dump-autoload --optimize
+            mkdir -p vendor
+            $PHP_BIN composer.phar dump-autoload --optimize --no-interaction
             
-            # 4. Permissions and Cache
+            # 4. Clear Cache and Fix Permissions
             rm -rf var/cache/*
             find . -type d -exec chmod 755 {} +
             find . -type f -exec chmod 644 {} +
             
             # 5. Final Bootstrap Test
-            $PHP_BIN -r "require 'config/config.inc.php'; echo 'Full Bootstrap Success';"
+            if [ -f "vendor/autoload.php" ]; then
+                $PHP_BIN -r "require 'config/config.inc.php'; echo 'Full Bootstrap Success';"
+            else
+                echo "ERROR: vendor/autoload.php was not created!"
+                exit 1
+            fi
