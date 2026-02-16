@@ -1,2 +1,33 @@
 gh_deploy_key
 gh_deploy_key.pub
+
+# Docker & DB
+.docker/
+mysql/
+docker-compose.override.yml
+
+# PrestaShop Core sensitive/local files
+/config/settings.inc.php
+/app/config/parameters.php
+/admin-dev/autoupgrade/
+
+# Cache and temporary files
+/var/cache/*
+/var/logs/*
+/var/sessions/*
+/tmp/*
+
+# User generated content (We will import this later)
+/img/*
+/upload/*
+/download/*
+
+# Assets that should be built or are environment specific
+.env
+.env.test
+/node_modules/
+/vendor/
+
+# OS files
+.DS_Store
+Thumbs.db
