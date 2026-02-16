@@ -73,7 +73,7 @@ jobs:
             # 4. Install Dependencies
             $PHP_BIN composer.phar install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs --no-security-blocking
 
-            # 5. ULTIMATE DEFINITIONS (All-in-one Fix)
+            # 5. ULTIMATE DEFINITIONS
             cat <<'EOF' > config/defines.inc.php
             <?php
             $currentDir = dirname(__FILE__);
@@ -93,16 +93,18 @@ jobs:
             define('_PS_DISPLAY_COMPATIBILITY_WARNING_', false);
             EOF
 
-            # 6. AUTOLOAD BRIDGE
+            # 6. FORCE-LOAD AUTOLOADER (Fixed Tools Not Found)
             cat <<'EOF' > config/autoload.php
             <?php
+            // Load Composer
             require_once __DIR__ . '/../vendor/autoload.php';
+
+            // Load PrestaShop Core Autoloader
             $psAutoloader = __DIR__ . '/../src/PrestaShop/Autoload/PrestashopAutoload.php';
             if (file_exists($psAutoloader)) {
                 require_once $psAutoloader;
-                if (class_exists('PrestashopAutoload')) {
-                    PrestashopAutoload::getInstance()->register();
-                }
+                // Register it manually to ensure "Tools" and other core classes are found
+                \PrestaShop\Autoload\PrestashopAutoload::getInstance()->register();
             }
             EOF
 
@@ -112,6 +114,6 @@ jobs:
             find . -name ".git" -prune -o -type d -exec chmod 755 {} +
             find . -name ".git" -prune -o -type f -exec chmod 644 {} +
             
-            # 8. Final Verification
+            # 8. Verification (We now test if Tools is actually available)
             echo "Running Bootstrap Test..."
-            $PHP_BIN -r "require '/var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/config/config.inc.php'; echo 'Full Bootstrap Success';"
+            $PHP_BIN -r "require 'config/config.inc.php'; if(class_exists('Tools')) echo 'Full Bootstrap Success';"
