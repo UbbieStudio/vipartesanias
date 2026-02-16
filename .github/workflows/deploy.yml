@@ -16,11 +16,10 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
-          extensions: mbstring, xml, ctype, iconv, intl, gd
+          extensions: mbstring, xml, ctype, iconv, intl, gd, zip, pdo_mysql
 
-      - name: Install Dependencies (Relocatable Autoloader)
+      - name: Install Dependencies (Local Build)
         run: |
-          # The key change: --classmap-authoritative and --no-scripts
           composer install --no-dev --optimize-autoloader --ignore-platform-reqs
 
       - name: Create parameters.yml
@@ -51,7 +50,8 @@ jobs:
       - name: Deploy via rsync
         uses: Burnett01/rsync-deployments@7.0.1
         with:
-          # Using -avzr to mirror the working GitHub build to the server
+          # We use --delete to ensure the server matches GitHub exactly
+          # We exclude var/cache so we don't upload local temp files
           switches: -avzr --delete --exclude='.git*' --exclude='var/cache/*'
           path: ./
           remote_path: /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/
@@ -68,10 +68,13 @@ jobs:
           script: |
             cd /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/
             
-            # 1. Update DB Shop URL
+            # 1. Update Database URL and Domain
             mysql -u vipartes_admin -p'${{ secrets.DB_PASS }}' vipartes_ps -e "UPDATE ps_shop_url SET domain='vipartesanias.ubbie.studio', domain_ssl='vipartesanias.ubbie.studio', physical_uri='/'; UPDATE ps_configuration SET value='vipartesanias.ubbie.studio' WHERE name='PS_SHOP_DOMAIN' OR name='PS_SHOP_DOMAIN_SSL';"
             
-            # 2. CLEAR CACHED CLASS INDEX (The ghost that haunts PrestaShop)
-            # PrestaShop often ignores the vendor autoloader if this index exists
+            # 2. The Final Fix: Nuke the entire cache directory
+            # This forces PrestaShop to regenerate the Class Index and find the missing Translator classes
             rm -rf var/cache/*
-            find var/cache/ -name "class_index.php" -delete
+            
+            # 3. Ensure permissions are correct for the webserver
+            find . -type d -exec chmod 755 {} +
+            find . -type f -exec chmod 644 {} +
