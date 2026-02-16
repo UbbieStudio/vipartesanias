@@ -48,7 +48,6 @@ jobs:
       - name: Deploy via rsync
         uses: Burnett01/rsync-deployments@7.0.1
         with:
-          # Removed --delete to ensure we don't accidentally wipe core server dirs
           switches: -avzr
           path: ./
           remote_path: /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/
@@ -66,22 +65,17 @@ jobs:
             export PHP_BIN="/opt/plesk/php/8.2/bin/php"
             cd /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/
             
-            # 1. Clear Cache Completely
+            # 1. Clear ALL cache and specifically the class index
             rm -rf var/cache/*
+            rm -f var/cache/prod/class_index.php
+            rm -f var/cache/dev/class_index.php
             
-            # 2. Fix Directory Permissions (Crucial for Plesk)
-            find . -type d -exec chmod 755 {} +
-            find . -type f -exec chmod 644 {} +
-            
-            # 3. Update Database
+            # 2. Fix Database URLs
             mysql -u vipartes_admin -p'${{ secrets.DB_PASS }}' vipartes_ps -e "UPDATE ps_shop_url SET domain='vipartesanias.ubbie.studio', domain_ssl='vipartesanias.ubbie.studio', physical_uri='/'; UPDATE ps_configuration SET value='vipartesanias.ubbie.studio' WHERE name='PS_SHOP_DOMAIN' OR name='PS_SHOP_DOMAIN_SSL';"
             
-            # 4. Perform a CLEAN Composer Install on the server
+            # 3. Clean and Install Composer
             $PHP_BIN -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
             $PHP_BIN composer-setup.php
-            # Remove vendor and lock to force a perfectly clean state
             rm -rf vendor composer.lock
             $PHP_BIN composer.phar install --no-dev --optimize-autoloader --ignore-platform-reqs
-            
-            # Cleanup
             rm composer-setup.php composer.phar
