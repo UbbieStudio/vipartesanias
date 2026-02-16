@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: checkout@v4
 
       - name: Create parameters.yml
         run: |
@@ -57,33 +57,34 @@ jobs:
             export PHP_BIN="/opt/plesk/php/8.2/bin/php"
             cd /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/
             
-            # 1. Database Update
+            # 1. Update Database
             mysql -u vipartes_admin -p'${{ secrets.DB_PASS }}' vipartes_ps -e "UPDATE ps_shop_url SET domain='vipartesanias.ubbie.studio', domain_ssl='vipartesanias.ubbie.studio', physical_uri='/'; UPDATE ps_configuration SET value='vipartesanias.ubbie.studio' WHERE name='PS_SHOP_DOMAIN' OR name='PS_SHOP_DOMAIN_SSL';"
             
-            # 2. Composer Force-Generate
+            # 2. Composer
             rm -f composer.phar
             $PHP_BIN -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
             $PHP_BIN composer-setup.php
             rm -rf vendor
             $PHP_BIN composer.phar dump-autoload --optimize --no-interaction
 
-            # 3. THE "GORDON RAMSAY" FIX
-            # Instead of just requiring the file, we inject a script that handles the class mapping manually
+            # 3. THE FIX: Create a proper PHP bridge without escape errors
+            # We use a heredoc with 'EOF' to prevent shell variable expansion
             cat <<'EOF' > fix_autoload.php
             <?php
-            \$path = shell_exec('find src -name PrestashopAutoload.php | head -n 1');
-            if (\$path) {
-                require_once trim(\$path);
+            $path = __DIR__ . '/src/PrestaShop/Autoload/PrestashopAutoload.php';
+            if (file_exists($path)) {
+                require_once $path;
                 if (!class_exists('PrestaShop\Autoload\PrestashopAutoload') && class_exists('PrestashopAutoload')) {
                     class_alias('PrestashopAutoload', 'PrestaShop\Autoload\PrestashopAutoload');
                 }
             }
             EOF
             
-            # Inject our fix into the very top of config/autoload.php
+            # Clean up previous failed attempts and inject the fix
+            sed -i "/fix_autoload.php/d" config/autoload.php
             sed -i "2i require_once __DIR__ . '/../fix_autoload.php';" config/autoload.php
 
-            # 4. Permissions and Cache
+            # 4. Clear Cache and Permissions
             rm -rf var/cache/*
             find . -name ".git" -prune -o -type d -exec chmod 755 {} +
             find . -name ".git" -prune -o -type f -exec chmod 644 {} +
