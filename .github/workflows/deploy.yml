@@ -60,24 +60,24 @@ jobs:
             # 1. Update Database
             mysql -u vipartes_admin -p'${{ secrets.DB_PASS }}' vipartes_ps -e "UPDATE ps_shop_url SET domain='vipartesanias.ubbie.studio', domain_ssl='vipartesanias.ubbie.studio', physical_uri='/'; UPDATE ps_configuration SET value='vipartesanias.ubbie.studio' WHERE name='PS_SHOP_DOMAIN' OR name='PS_SHOP_DOMAIN_SSL';"
             
-            # 2. Setup Composer
+            # 2. Composer Setup
             rm -f composer.phar
             $PHP_BIN -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
             $PHP_BIN composer-setup.php
             rm composer-setup.php
 
-            # 3. Maps
+            # 3. Download Maps
             curl -L https://raw.githubusercontent.com/PrestaShop/PrestaShop/8.2.4/composer.json -o composer.json
             curl -L https://raw.githubusercontent.com/PrestaShop/PrestaShop/8.2.4/composer.lock -o composer.lock
 
             # 4. Install
             $PHP_BIN composer.phar install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs --no-security-blocking
 
-            # 5. EXPANDED DEFINITIONS (Fixed _PS_CACHE_DIR_ and others)
+            # 5. FULL INDUSTRY-STANDARD DEFINITIONS
             cat <<'EOF' > config/defines.inc.php
             <?php
-            define('_PS_VERSION_', '8.2.4');
             $currentDir = dirname(__FILE__);
+            define('_PS_VERSION_', '8.2.4');
             define('_PS_CONFIG_DIR_', $currentDir.'/');
             define('_PS_ROOT_DIR_', realpath($currentDir.'/..').'/');
             define('_PS_CORE_DIR_', _PS_ROOT_DIR_);
@@ -85,6 +85,9 @@ jobs:
             define('_PS_CACHE_DIR_', _PS_VAR_DIR_.'cache/');
             define('_PS_MODULE_DIR_', _PS_ROOT_DIR_.'modules/');
             define('_PS_TOOL_DIR_', _PS_ROOT_DIR_.'tools/');
+            define('_PS_TRANSLATIONS_DIR_', _PS_ROOT_DIR_.'translations/');
+            define('_PS_CUSTOM_CONFIG_FILE_', _PS_CONFIG_DIR_.'settings.inc.php');
+            define('_PS_IMG_DIR_', _PS_ROOT_DIR_.'img/');
             define('_PS_MODE_DEV_', false);
             EOF
 
