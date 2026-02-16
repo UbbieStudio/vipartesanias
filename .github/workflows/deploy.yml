@@ -57,21 +57,23 @@ jobs:
             export PHP_BIN="/opt/plesk/php/8.2/bin/php"
             cd /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/
             
-            # 1. Database Update
+            # 1. Database
             mysql -u vipartes_admin -p'${{ secrets.DB_PASS }}' vipartes_ps -e "UPDATE ps_shop_url SET domain='vipartesanias.ubbie.studio', domain_ssl='vipartesanias.ubbie.studio', physical_uri='/'; UPDATE ps_configuration SET value='vipartesanias.ubbie.studio' WHERE name='PS_SHOP_DOMAIN' OR name='PS_SHOP_DOMAIN_SSL';"
             
-            # 2. Composer & Maps
+            # 2. Composer
             rm -f composer.phar
             $PHP_BIN -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
             $PHP_BIN composer-setup.php
             rm composer-setup.php
             curl -L https://raw.githubusercontent.com/PrestaShop/PrestaShop/8.2.4/composer.json -o composer.json
             curl -L https://raw.githubusercontent.com/PrestaShop/PrestaShop/8.2.4/composer.lock -o composer.lock
-
-            # 3. Install
             $PHP_BIN composer.phar install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs
 
-            # 4. COMPREHENSIVE DEFINES
+            # 3. Verify Directory Integrity (Diagnostic)
+            echo "Checking for core files..."
+            ls -d classes/ src/ config/ vendor/ || echo "WARNING: CORE DIRECTORIES MISSING"
+
+            # 4. DEFINES
             cat <<'EOF' > config/defines.inc.php
             <?php
             $currentDir = dirname(__FILE__);
@@ -90,26 +92,36 @@ jobs:
             define('_PS_DISPLAY_COMPATIBILITY_WARNING_', false);
             EOF
 
-            # 5. THE CRITICAL AUTOLOAD FIX
-            # This manually registers the PrestaShop core autoloader for legacy classes
+            # 5. HARDCODED ALIAS BRIDGE
+            # If the autoloader fails, we manually point to the core files.
             cat <<'EOF' > config/autoload.php
             <?php
             require_once __DIR__ . '/../vendor/autoload.php';
             
-            // Register the PrestaShop Autoloader manually
-            // This is required to find classes like 'Tools', 'Context', 'Db'
-            $psAutoloader = __DIR__ . '/../src/PrestaShop/Autoload/PrestashopAutoload.php';
-            if (file_exists($psAutoloader)) {
-                require_once $psAutoloader;
-                \PrestaShop\Autoload\PrestashopAutoload::getInstance()->register();
+            spl_autoload_register(function ($class) {
+                $file = __DIR__ . '/../classes/' . $class . '.php';
+                if (file_exists($file)) {
+                    require_once $file;
+                }
+                // PrestaShop 8 standard
+                $coreFile = __DIR__ . '/../classes/' . str_replace('Core', '', $class) . '.php';
+                if (str_ends_with($class, 'Core') && file_exists($coreFile)) {
+                   require_once $coreFile;
+                }
+            }, true, true);
+
+            // Force Alias for Tools
+            if (!class_exists('Tools')) {
+                require_once __DIR__ . '/../classes/Tools.php';
+                class_alias('ToolsCore', 'Tools');
             }
             EOF
 
-            # 6. Cleanup & Permissions
+            # 6. Cleanup
             mkdir -p var/cache/prod
             rm -rf var/cache/*
-            chmod -R 777 var/cache
+            chmod -R 775 var/cache
             
             # 7. VERIFICATION
             echo "Running Bootstrap Test..."
-            $PHP_BIN -d display_errors=1 -r "require 'config/config.inc.php'; if(class_exists('Tools')) echo 'Full Bootstrap Success';"
+            $PHP_BIN -d display_errors=1 -r "require 'config/autoload.php'; require 'config/config.inc.php'; if(class_exists('Tools')) echo 'Full Bootstrap Success';"
