@@ -1,0 +1,23 @@
+name: Deploy PrestaShop to Server
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy via rsync
+        uses: Burnett01/rsync-deployments@7.0.1
+        with:
+          switches: -avzr --delete
+          path: ./
+          remote_path: /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs
+          remote_host: 148.251.42.8
+          remote_user: ubbie_vipartesanias
+          remote_key: ${{ secrets.SERVER_SSH_KEY }}
