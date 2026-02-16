@@ -15,9 +15,9 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2' # Switched to 8.2 to match your server
+          php-version: '8.2'
 
-      - name: Install Dependencies (Composer)
+      - name: Install Dependencies (Composer Local)
         run: composer install --no-dev --optimize-autoloader --ignore-platform-reqs
 
       - name: Create parameters.yml
@@ -48,7 +48,8 @@ jobs:
       - name: Deploy via rsync
         uses: Burnett01/rsync-deployments@7.0.1
         with:
-          switches: -avzr --delete
+          # Removed --delete to ensure we don't accidentally wipe core server dirs
+          switches: -avzr
           path: ./
           remote_path: /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/
           remote_host: 148.251.42.8
@@ -62,20 +63,25 @@ jobs:
           username: ubbie_vipartesanias
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            # Set the confirmed path to PHP 8.2
             export PHP_BIN="/opt/plesk/php/8.2/bin/php"
             cd /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/
             
-            # 1. Fix Database URLs
-            mysql -u vipartes_admin -p'${{ secrets.DB_PASS }}' vipartes_ps -e "UPDATE ps_shop_url SET domain='vipartesanias.ubbie.studio', domain_ssl='vipartesanias.ubbie.studio', physical_uri='/'; UPDATE ps_configuration SET value='vipartesanias.ubbie.studio' WHERE name='PS_SHOP_DOMAIN' OR name='PS_SHOP_DOMAIN_SSL';"
-            
-            # 2. Clear Cache
+            # 1. Clear Cache Completely
             rm -rf var/cache/*
             
-            # 3. Force rebuild of autoloader using the correct PHP 8.2 binary
+            # 2. Fix Directory Permissions (Crucial for Plesk)
+            find . -type d -exec chmod 755 {} +
+            find . -type f -exec chmod 644 {} +
+            
+            # 3. Update Database
+            mysql -u vipartes_admin -p'${{ secrets.DB_PASS }}' vipartes_ps -e "UPDATE ps_shop_url SET domain='vipartesanias.ubbie.studio', domain_ssl='vipartesanias.ubbie.studio', physical_uri='/'; UPDATE ps_configuration SET value='vipartesanias.ubbie.studio' WHERE name='PS_SHOP_DOMAIN' OR name='PS_SHOP_DOMAIN_SSL';"
+            
+            # 4. Perform a CLEAN Composer Install on the server
             $PHP_BIN -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
             $PHP_BIN composer-setup.php
-            $PHP_BIN composer.phar dump-autoload --optimize --no-dev
+            # Remove vendor and lock to force a perfectly clean state
+            rm -rf vendor composer.lock
+            $PHP_BIN composer.phar install --no-dev --optimize-autoloader --ignore-platform-reqs
             
-            # Clean up
+            # Cleanup
             rm composer-setup.php composer.phar
