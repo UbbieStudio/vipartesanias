@@ -62,7 +62,12 @@ jobs:
           username: ubbie_vipartesanias
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            # 1. Clear Cache
-            rm -rf /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/var/cache/*
-            # 2. Fix Database URLs (Domain and SSL)
+            # 1. Fix Database URLs (Domain and SSL)
             mysql -u vipartes_admin -p'${{ secrets.DB_PASS }}' vipartes_ps -e "UPDATE ps_shop_url SET domain='vipartesanias.ubbie.studio', domain_ssl='vipartesanias.ubbie.studio', physical_uri='/'; UPDATE ps_configuration SET value='vipartesanias.ubbie.studio' WHERE name='PS_SHOP_DOMAIN' OR name='PS_SHOP_DOMAIN_SSL';"
+            
+            # 2. Force rebuild of the autoloader using Server's PHP
+            cd /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/
+            /opt/plesk/php/8.1/bin/php /usr/lib/php/composer.phar dump-autoload --optimize --no-dev
+            
+            # 3. Clear Cache (Last step so it rebuilds with fresh autoloader)
+            rm -rf /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/var/cache/*
