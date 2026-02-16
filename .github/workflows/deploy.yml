@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: checkout@v4
+        uses: actions/checkout@v4
 
       - name: Create parameters.yml
         run: |
@@ -67,8 +67,7 @@ jobs:
             rm -rf vendor
             $PHP_BIN composer.phar dump-autoload --optimize --no-interaction
 
-            # 3. THE FIX: Create a proper PHP bridge without escape errors
-            # We use a heredoc with 'EOF' to prevent shell variable expansion
+            # 3. THE FIX: Create bridge without shell expansion issues
             cat <<'EOF' > fix_autoload.php
             <?php
             $path = __DIR__ . '/src/PrestaShop/Autoload/PrestashopAutoload.php';
@@ -80,7 +79,7 @@ jobs:
             }
             EOF
             
-            # Clean up previous failed attempts and inject the fix
+            # Inject the fix into config/autoload.php
             sed -i "/fix_autoload.php/d" config/autoload.php
             sed -i "2i require_once __DIR__ . '/../fix_autoload.php';" config/autoload.php
 
