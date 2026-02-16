@@ -57,7 +57,7 @@ jobs:
             export PHP_BIN="/opt/plesk/php/8.2/bin/php"
             cd /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/
             
-            # 1. Database Update
+            # 1. Update Database
             mysql -u vipartes_admin -p'${{ secrets.DB_PASS }}' vipartes_ps -e "UPDATE ps_shop_url SET domain='vipartesanias.ubbie.studio', domain_ssl='vipartesanias.ubbie.studio', physical_uri='/'; UPDATE ps_configuration SET value='vipartesanias.ubbie.studio' WHERE name='PS_SHOP_DOMAIN' OR name='PS_SHOP_DOMAIN_SSL';"
             
             # 2. Setup Composer Binary
@@ -66,19 +66,14 @@ jobs:
             $PHP_BIN composer-setup.php
             rm composer-setup.php
             
-            # 3. Double-check Plugin Permissions on Server
-            $PHP_BIN composer.phar config allow-plugins.composer/installers true --no-interaction
-            $PHP_BIN composer.phar config allow-plugins.prestashop/composer-registrar true --no-interaction
-            $PHP_BIN composer.phar config allow-plugins.prestashop/composer-installer true --no-interaction
-            
-            # 4. Install Dependencies
+            # 3. Install Dependencies (Fresh)
             rm -rf vendor
             $PHP_BIN composer.phar install --no-dev --optimize-autoloader --ignore-platform-reqs --no-interaction
             
-            # 5. Clear Cache and Permissions
+            # 4. Clear Cache and Permissions
             rm -rf var/cache/*
             find . -type d -exec chmod 755 {} +
             find . -type f -exec chmod 644 {} +
             
-            # 6. Final Bootstrap Test
+            # 5. Final Bootstrap Test
             $PHP_BIN -r "require 'config/config.inc.php'; echo 'Full Bootstrap Success';"

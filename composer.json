@@ -3,14 +3,17 @@
     "description": "PrestaShop project",
     "license": "OSL-3.0",
     "type": "project",
+    "repositories": [
+        {
+            "type": "composer",
+            "url": "https://packagist.org"
+        }
+    ],
     "require": {
         "php": ">=8.1",
-        "composer/installers": "^1.0 || ^2.0",
-        "prestashop/autoloader": "^1.0",
-        "prestashop/composer-registrar": "^1.0"
+        "prestashop/prestashop": "8.1.*",
+        "composer/installers": "^1.0 || ^2.0"
     },
-    "minimum-stability": "dev",
-    "prefer-stable": true,
     "config": {
         "preferred-install": "dist",
         "prepend-autoloader": false,
@@ -32,12 +35,5 @@
             "app/AppCache.php"
         ]
     },
-    "scripts": {
-        "post-install-cmd": [
-            "PrestaShop\\PrestaShop\\Composer\\ScriptHandler::install"
-        ],
-        "post-update-cmd": [
-            "PrestaShop\\PrestaShop\\Composer\\ScriptHandler::install"
-        ]
-    }
+    "minimum-stability": "stable"
 }
