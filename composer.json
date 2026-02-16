@@ -21,8 +21,7 @@
         "classmap": [
             "app/AppKernel.php",
             "app/AppCache.php",
-            "classes/",
-            "src/PrestaShop/Autoload/"
+            "classes/"
         ]
     }
 }
