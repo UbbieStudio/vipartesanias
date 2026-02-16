@@ -57,51 +57,48 @@ jobs:
             export PHP_BIN="/opt/plesk/php/8.2/bin/php"
             cd /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/
             
-            # 1. Database Configuration Update
+            # 1. Update Database
             mysql -u vipartes_admin -p'${{ secrets.DB_PASS }}' vipartes_ps -e "UPDATE ps_shop_url SET domain='vipartesanias.ubbie.studio', domain_ssl='vipartesanias.ubbie.studio', physical_uri='/'; UPDATE ps_configuration SET value='vipartesanias.ubbie.studio' WHERE name='PS_SHOP_DOMAIN' OR name='PS_SHOP_DOMAIN_SSL';"
             
-            # 2. Composer Setup
+            # 2. Setup Composer
             rm -f composer.phar
             $PHP_BIN -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
             $PHP_BIN composer-setup.php
             rm composer-setup.php
 
-            # 3. Download Official 8.2.4 Dependency Map
+            # 3. Download Maps
             curl -L https://raw.githubusercontent.com/PrestaShop/PrestaShop/8.2.4/composer.json -o composer.json
             curl -L https://raw.githubusercontent.com/PrestaShop/PrestaShop/8.2.4/composer.lock -o composer.lock
 
-            # 4. Final Core Installation
-            # The vendor folder already exists from the last run, but this ensures integrity
+            # 4. Composer Install
             $PHP_BIN composer.phar install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs --no-security-blocking
 
-            # 5. FIXED Autoload Bridge (Resolves the Singleton TypeError)
+            # 5. CREATE MISSING VERSION CONSTANTS
+            # This fixes the "Undefined constant _PS_VERSION_" error
+            cat <<'EOF' > config/settings.inc.php
+            <?php
+            define('_PS_VERSION_', '8.2.4');
+            define('_PHP_VERSION_ID_', PHP_VERSION_ID);
+            EOF
+
+            # 6. REFINED AUTOLOAD BRIDGE
             cat <<'EOF' > config/autoload.php
             <?php
-            // 1. Standard Composer Autoloader
-            if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
-                require_once __DIR__ . '/../vendor/autoload.php';
-            }
-
-            // 2. PrestaShop Legacy Autoloader
+            require_once __DIR__ . '/../vendor/autoload.php';
             $psAutoloader = __DIR__ . '/../src/PrestaShop/Autoload/PrestashopAutoload.php';
             if (file_exists($psAutoloader)) {
                 require_once $psAutoloader;
-                
-                // Use the class mapping that PrestaShop expects
                 if (class_exists('PrestashopAutoload')) {
-                    if (!class_exists('PrestaShop\Autoload\PrestashopAutoload')) {
-                        class_alias('PrestashopAutoload', 'PrestaShop\Autoload\PrestashopAutoload');
-                    }
                     PrestashopAutoload::getInstance()->register();
                 }
             }
             EOF
 
-            # 6. Permissions and Cache Flush
+            # 7. Permissions and Cache
             rm -rf var/cache/*
             find . -name ".git" -prune -o -type d -exec chmod 755 {} +
             find . -name ".git" -prune -o -type f -exec chmod 644 {} +
             
-            # 7. Verification Test
+            # 8. Verification
             echo "Running Bootstrap Test..."
             $PHP_BIN -r "require 'config/config.inc.php'; echo 'Full Bootstrap Success';"
