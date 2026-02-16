@@ -55,10 +55,14 @@ jobs:
           remote_user: ubbie_vipartesanias
           remote_key: ${{ secrets.SERVER_SSH_KEY }}
 
-      - name: Clear Cache on Server
+      - name: Server Post-Deployment Tasks
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: 148.251.42.8
           username: ubbie_vipartesanias
           key: ${{ secrets.SERVER_SSH_KEY }}
-          script: rm -rf /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/var/cache/*
+          script: |
+            # 1. Clear Cache
+            rm -rf /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/var/cache/*
+            # 2. Fix Database URLs (Domain and SSL)
+            mysql -u vipartes_admin -p'${{ secrets.DB_PASS }}' vipartes_ps -e "UPDATE ps_shop_url SET domain='vipartesanias.ubbie.studio', domain_ssl='vipartesanias.ubbie.studio', physical_uri='/'; UPDATE ps_configuration SET value='vipartesanias.ubbie.studio' WHERE name='PS_SHOP_DOMAIN' OR name='PS_SHOP_DOMAIN_SSL';"
