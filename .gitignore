@@ -1,32 +1,15 @@
-gh_deploy_key
-gh_deploy_key.pub
+# Ignore everything by default
+/*
 
-# Docker & DB
-.docker/
-mysql/
-docker-compose.override.yml
+# Allow the GitHub Actions folder
+!/.github/
 
-# PrestaShop Core sensitive/local files
-/config/settings.inc.php
-/app/config/parameters.php
-/admin-dev/autoupgrade/
+# Allow the .gitignore file itself
+!/.gitignore
 
-# Cache and temporary files
-/var/cache/*
-/var/logs/*
-/var/sessions/*
-/tmp/*
+# Allow the themes folder, but ignore other themes inside it
+!/themes/
+/themes/*
 
-# User generated content (We will import this later)
-/img/*
-/upload/*
-/download/*
-
-# Assets
-.env
-.env.test
-/node_modules/
-
-# OS files
-.DS_Store
-Thumbs.db
+# Specifically ALLOW your redesign theme
+!/themes/vipartes-theme/

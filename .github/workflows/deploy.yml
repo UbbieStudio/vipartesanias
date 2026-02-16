@@ -1,4 +1,4 @@
-name: Deploy PrestaShop to Server
+name: Deploy Redesign
 
 on:
   push:
@@ -12,105 +12,25 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Create parameters.yml
-        run: |
-          mkdir -p app/config
-          cat <<EOF > app/config/parameters.yml
-          parameters:
-              database_host: 127.0.0.1
-              database_port: 3306
-              database_name: vipartes_ps
-              database_user: vipartes_admin
-              database_password: ${{ secrets.DB_PASS }}
-              database_prefix: ps_
-              database_engine: InnoDB
-              mailer_transport: smtp
-              mailer_host: 127.0.0.1
-              secret: ${{ secrets.PS_SECRET }}
-              ps_caching: CacheMemcache
-              ps_cache_enable: false
-              ps_creation_date: '2024-01-01'
-              locale: es-ES
-              use_html_purifier: true
-              cookie_key: ${{ secrets.PS_COOKIE_KEY }}
-              cookie_iv: ${{ secrets.PS_COOKIE_IV }}
-              new_cookie_key: ${{ secrets.PS_NEW_COOKIE_KEY }}
-          EOF
-
-      - name: Deploy via rsync
+      - name: Sync Theme Files
         uses: Burnett01/rsync-deployments@7.0.1
         with:
-          switches: -avzr --delete --exclude='.git*' --exclude='var/cache/*' --exclude='vendor/*'
+          # -avzr syncs files; we EXCLUDE the .git folder
+          # We do NOT use --delete so we don't accidentally wipe the server core
+          switches: -avzr --exclude='.git*'
           path: ./
           remote_path: /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/
           remote_host: 148.251.42.8
           remote_user: ubbie_vipartesanias
           remote_key: ${{ secrets.SERVER_SSH_KEY }}
 
-      - name: Server Post-Deployment Tasks
+      - name: Clear Smarty Cache
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: 148.251.42.8
           username: ubbie_vipartesanias
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            export PHP_BIN="/opt/plesk/php/8.2/bin/php"
-            cd /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/
-            
-            # 1. Database
-            mysql -u vipartes_admin -p'${{ secrets.DB_PASS }}' vipartes_ps -e "UPDATE ps_shop_url SET domain='vipartesanias.ubbie.studio', domain_ssl='vipartesanias.ubbie.studio', physical_uri='/'; UPDATE ps_configuration SET value='vipartesanias.ubbie.studio' WHERE name='PS_SHOP_DOMAIN' OR name='PS_SHOP_DOMAIN_SSL';"
-            
-            # 2. Composer
-            rm -f composer.phar
-            $PHP_BIN -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
-            $PHP_BIN composer-setup.php
-            rm composer-setup.php
-            curl -L https://raw.githubusercontent.com/PrestaShop/PrestaShop/8.2.4/composer.json -o composer.json
-            curl -L https://raw.githubusercontent.com/PrestaShop/PrestaShop/8.2.4/composer.lock -o composer.lock
-            $PHP_BIN composer.phar install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs
-
-            # 3. OVERRIDE DEFINES.INC.PHP (The Master Fix)
-            # This forces PHP to find the core classes by their real names
-            cat <<'EOF' > config/defines.inc.php
-            <?php
-            $currentDir = dirname(__FILE__);
-            define('_PS_VERSION_', '8.2.4');
-            define('_PS_ROOT_DIR_', realpath($currentDir.'/..').'/');
-            define('_PS_CLASS_DIR_', _PS_ROOT_DIR_.'classes/');
-            
-            // Critical: Force load the absolute most important classes
-            require_once(_PS_CLASS_DIR_.'Tools.php');
-            require_once(_PS_CLASS_DIR_.'Context.php');
-            require_once(_PS_CLASS_DIR_.'db/Db.php');
-            require_once(_PS_CLASS_DIR_.'Configuration.php');
-            require_once(_PS_CLASS_DIR_.'Shop.php');
-            
-            // Manually Create Aliases
-            if (!class_exists('Tools')) class_alias('ToolsCore', 'Tools');
-            if (!class_exists('Context')) class_alias('ContextCore', 'Context');
-            if (!class_exists('Db')) class_alias('DbCore', 'Db');
-            if (!class_exists('Configuration')) class_alias('ConfigurationCore', 'Configuration');
-            
-            define('_PS_CONFIG_DIR_', _PS_ROOT_DIR_.'config/');
-            define('_PS_VAR_DIR_', _PS_ROOT_DIR_.'var/');
-            define('_PS_CACHE_DIR_', _PS_VAR_DIR_.'cache/');
-            define('_PS_MODULE_DIR_', _PS_ROOT_DIR_.'modules/');
-            define('_PS_MODE_DEV_', false);
-            define('_PS_DEBUG_PROFILING_', false);
-            define('_PS_DISPLAY_COMPATIBILITY_WARNING_', false);
-            EOF
-
-            # 4. Standard Autoload
-            cat <<'EOF' > config/autoload.php
-            <?php
-            require_once __DIR__ . '/../vendor/autoload.php';
-            EOF
-
-            # 5. Cleanup
-            mkdir -p var/cache/prod
-            rm -rf var/cache/*
-            chmod -R 775 var/cache
-            
-            # 6. VERIFICATION
-            echo "Running Bootstrap Test..."
-            $PHP_BIN -d display_errors=1 -r "require 'config/config.inc.php'; if(class_exists('Context')) echo 'Full Bootstrap Success';"
+            # Forces PrestaShop to see your HTML/CSS changes
+            rm -rf /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/var/cache/prod/smarty/compile/*
+            echo "Design cache cleared successfully!"

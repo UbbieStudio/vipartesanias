@@ -1,0 +1,27 @@
+name: vipartes-theme
+display_name: Vipartesanias Redesign
+version: 1.0.0
+author:
+  name: Vipartesanias
+  url: https://vipartesanias.ubbie.studio
+
+meta:
+  compatibility:
+      from: 8.0.0
+      to: ~
+  available_layouts:
+    layout-full-width:
+      name: Full Width
+      description: No side columns, ideal for distraction-free pages such as product pages.
+    layout-both-columns:
+      name: Three Columns
+      description: One left column and one right column.
+    layout-left-column:
+      name: Two Columns, small left column
+      description: One left column.
+    layout-right-column:
+      name: Two Columns, small right column
+      description: One right column.
+
+assets:
+  use_parent_assets: true # This allows you to inherit the base classic JS/CSS
