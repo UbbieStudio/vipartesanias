@@ -20,29 +20,27 @@ jobs:
       - name: Install Dependencies (Composer)
         run: composer install --no-dev --optimize-autoloader --ignore-platform-reqs
 
-      - name: Generate parameters.yml
+      - name: Create parameters.yml
         run: |
-          cat <<EOF > app/config/parameters.yml
-          parameters:
-              database_host: 127.0.0.1
-              database_port: 3306
-              database_name: vipartes_ps
-              database_user: vipartes_admin
-              database_password: ${{ secrets.DB_PASS }}
-              database_prefix: ps_
-              database_engine: InnoDB
-              mailer_transport: smtp
-              mailer_host: 127.0.0.1
-              secret: ${{ secrets.PS_SECRET }}
-              ps_caching: CacheMemcache
-              ps_cache_enable: false
-              ps_creation_date: '2024-01-01'
-              locale: es-ES
-              use_html_purifier: true
-              cookie_key: ${{ secrets.PS_COOKIE_KEY }}
-              cookie_iv: ${{ secrets.PS_COOKIE_IV }}
-              new_cookie_key: ${{ secrets.PS_NEW_COOKIE_KEY }}
-          EOF
+          echo "parameters:" > app/config/parameters.yml
+          echo "    database_host: 127.0.0.1" >> app/config/parameters.yml
+          echo "    database_port: 3306" >> app/config/parameters.yml
+          echo "    database_name: vipartes_ps" >> app/config/parameters.yml
+          echo "    database_user: vipartes_admin" >> app/config/parameters.yml
+          echo "    database_password: ${{ secrets.DB_PASS }}" >> app/config/parameters.yml
+          echo "    database_prefix: ps_" >> app/config/parameters.yml
+          echo "    database_engine: InnoDB" >> app/config/parameters.yml
+          echo "    mailer_transport: smtp" >> app/config/parameters.yml
+          echo "    mailer_host: 127.0.0.1" >> app/config/parameters.yml
+          echo "    secret: ${{ secrets.PS_SECRET }}" >> app/config/parameters.yml
+          echo "    ps_caching: CacheMemcache" >> app/config/parameters.yml
+          echo "    ps_cache_enable: false" >> app/config/parameters.yml
+          echo "    ps_creation_date: '2024-01-01'" >> app/config/parameters.yml
+          echo "    locale: es-ES" >> app/config/parameters.yml
+          echo "    use_html_purifier: true" >> app/config/parameters.yml
+          echo "    cookie_key: ${{ secrets.PS_COOKIE_KEY }}" >> app/config/parameters.yml
+          echo "    cookie_iv: ${{ secrets.PS_COOKIE_IV }}" >> app/config/parameters.yml
+          echo "    new_cookie_key: ${{ secrets.PS_NEW_COOKIE_KEY }}" >> app/config/parameters.yml
 
       - name: Deploy via rsync
         uses: Burnett01/rsync-deployments@7.0.1
