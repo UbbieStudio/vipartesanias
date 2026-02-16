@@ -57,7 +57,7 @@ jobs:
             export PHP_BIN="/opt/plesk/php/8.2/bin/php"
             cd /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/
             
-            # 1. Update Database
+            # 1. Update Database (Shop URL & Domain)
             mysql -u vipartes_admin -p'${{ secrets.DB_PASS }}' vipartes_ps -e "UPDATE ps_shop_url SET domain='vipartesanias.ubbie.studio', domain_ssl='vipartesanias.ubbie.studio', physical_uri='/'; UPDATE ps_configuration SET value='vipartesanias.ubbie.studio' WHERE name='PS_SHOP_DOMAIN' OR name='PS_SHOP_DOMAIN_SSL';"
             
             # 2. Composer Setup
@@ -66,18 +66,19 @@ jobs:
             $PHP_BIN composer-setup.php
             rm composer-setup.php
 
-            # 3. Download Maps
+            # 3. Download Core Maps (Ensures vendor matches PS 8.2.4)
             curl -L https://raw.githubusercontent.com/PrestaShop/PrestaShop/8.2.4/composer.json -o composer.json
             curl -L https://raw.githubusercontent.com/PrestaShop/PrestaShop/8.2.4/composer.lock -o composer.lock
 
             # 4. Install Dependencies
-            $PHP_BIN composer.phar install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs --no-security-blocking
+            $PHP_BIN composer.phar install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs
 
-            # 5. ULTIMATE DEFINITIONS
+            # 5. GENERATE DEFINES.INC.PHP
+            # This satisfies all the constant checks in config.inc.php
             cat <<'EOF' > config/defines.inc.php
             <?php
             $currentDir = dirname(__FILE__);
-            define('_PS_VERSION_', '8.2.4');
+            if (!defined('_PS_VERSION_')) define('_PS_VERSION_', '8.2.4');
             define('_PS_CONFIG_DIR_', $currentDir.'/');
             define('_PS_ROOT_DIR_', realpath($currentDir.'/..').'/');
             define('_PS_CORE_DIR_', _PS_ROOT_DIR_);
@@ -93,27 +94,26 @@ jobs:
             define('_PS_DISPLAY_COMPATIBILITY_WARNING_', false);
             EOF
 
-            # 6. FORCE-LOAD AUTOLOADER (Fixed Tools Not Found)
+            # 6. GENERATE AUTOLOAD.PHP
+            # Bridge between Composer and PrestaShop Legacy Core
             cat <<'EOF' > config/autoload.php
             <?php
-            // Load Composer
             require_once __DIR__ . '/../vendor/autoload.php';
-
-            // Load PrestaShop Core Autoloader
-            $psAutoloader = __DIR__ . '/../src/PrestaShop/Autoload/PrestashopAutoload.php';
-            if (file_exists($psAutoloader)) {
-                require_once $psAutoloader;
-                // Register it manually to ensure "Tools" and other core classes are found
+            $psAutoloaderFile = __DIR__ . '/../src/PrestaShop/Autoload/PrestashopAutoload.php';
+            if (file_exists($psAutoloaderFile)) {
+                require_once $psAutoloaderFile;
                 \PrestaShop\Autoload\PrestashopAutoload::getInstance()->register();
             }
             EOF
 
-            # 7. Heavy Cleanup & Permissions
-            mkdir -p var/cache
+            # 7. File System Cleanup
+            mkdir -p var/cache/prod
             rm -rf var/cache/*
+            chmod -R 755 var/cache
             find . -name ".git" -prune -o -type d -exec chmod 755 {} +
             find . -name ".git" -prune -o -type f -exec chmod 644 {} +
             
-            # 8. Verification (We now test if Tools is actually available)
+            # 8. FINAL BOOTSTRAP VERIFICATION
+            # We force-load our bridge before the config to ensure "Tools" exists
             echo "Running Bootstrap Test..."
-            $PHP_BIN -r "require 'config/config.inc.php'; if(class_exists('Tools')) echo 'Full Bootstrap Success';"
+            $PHP_BIN -r "require 'config/autoload.php'; require 'config/config.inc.php'; if(class_exists('Tools')) echo 'Full Bootstrap Success';"
