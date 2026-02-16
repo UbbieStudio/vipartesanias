@@ -66,15 +66,14 @@ jobs:
             $PHP_BIN composer-setup.php
             rm composer-setup.php
 
-            # 3. Download Maps
+            # 3. Maps
             curl -L https://raw.githubusercontent.com/PrestaShop/PrestaShop/8.2.4/composer.json -o composer.json
             curl -L https://raw.githubusercontent.com/PrestaShop/PrestaShop/8.2.4/composer.lock -o composer.lock
 
             # 4. Install
             $PHP_BIN composer.phar install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs --no-security-blocking
 
-            # 5. FULL PATH DEFINITIONS
-            # This provides everything config.inc.php is looking for.
+            # 5. EXPANDED DEFINITIONS (Fixed _PS_CACHE_DIR_ and others)
             cat <<'EOF' > config/defines.inc.php
             <?php
             define('_PS_VERSION_', '8.2.4');
@@ -82,6 +81,10 @@ jobs:
             define('_PS_CONFIG_DIR_', $currentDir.'/');
             define('_PS_ROOT_DIR_', realpath($currentDir.'/..').'/');
             define('_PS_CORE_DIR_', _PS_ROOT_DIR_);
+            define('_PS_VAR_DIR_', _PS_ROOT_DIR_.'var/');
+            define('_PS_CACHE_DIR_', _PS_VAR_DIR_.'cache/');
+            define('_PS_MODULE_DIR_', _PS_ROOT_DIR_.'modules/');
+            define('_PS_TOOL_DIR_', _PS_ROOT_DIR_.'tools/');
             define('_PS_MODE_DEV_', false);
             EOF
 
@@ -98,11 +101,12 @@ jobs:
             }
             EOF
 
-            # 7. Permissions and Cache
+            # 7. Heavy Cleanup
+            mkdir -p var/cache
             rm -rf var/cache/*
             find . -name ".git" -prune -o -type d -exec chmod 755 {} +
             find . -name ".git" -prune -o -type f -exec chmod 644 {} +
             
-            # 8. Verification (Modified to use absolute path)
+            # 8. Verification
             echo "Running Bootstrap Test..."
             $PHP_BIN -r "require '/var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/config/config.inc.php'; echo 'Full Bootstrap Success';"
