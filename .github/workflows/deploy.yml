@@ -57,25 +57,25 @@ jobs:
             export PHP_BIN="/opt/plesk/php/8.2/bin/php"
             cd /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/
             
-            # 1. Database Update
+            # 1. Update Database
             mysql -u vipartes_admin -p'${{ secrets.DB_PASS }}' vipartes_ps -e "UPDATE ps_shop_url SET domain='vipartesanias.ubbie.studio', domain_ssl='vipartesanias.ubbie.studio', physical_uri='/'; UPDATE ps_configuration SET value='vipartesanias.ubbie.studio' WHERE name='PS_SHOP_DOMAIN' OR name='PS_SHOP_DOMAIN_SSL';"
             
-            # 2. Setup Composer
+            # 2. Re-setup Composer
             rm -f composer.phar
             $PHP_BIN -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
             $PHP_BIN composer-setup.php
-            rm composer-setup.php
-
-            # 3. Force Core Requirements
+            
+            # 3. FORCE MINIMUM STABILITY (The Fix for HTMLPurifier)
             $PHP_BIN -r "
               \$json = json_decode(file_get_contents('composer.json'), true);
-              \$json['require']['prestashop/prestashop'] = '8.2.*';
-              file_put_contents('composer.json', json_encode(\$json, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+              \$json['minimum-stability'] = 'dev';
+              \$json['prefer-stable'] = true;
+              file_put_contents('composer.json', json_encode(\$json, JSON_PRETTY_PRINT));
             "
 
-            # 4. The Correct Install Command
+            # 4. Use REQUIRE instead of INSTALL to force dependency resolution
             rm -rf vendor composer.lock
-            $PHP_BIN composer.phar install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs --no-security-blocking
+            $PHP_BIN composer.phar require prestashop/prestashop:8.2.* --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs --no-security-blocking
 
             # 5. Fix Autoload Bridge
             cat <<'EOF' > config/autoload.php
@@ -95,7 +95,7 @@ jobs:
             }
             EOF
 
-            # 6. Cleanup
+            # 6. Final cleanup
             rm -rf var/cache/*
             find . -name ".git" -prune -o -type d -exec chmod 755 {} +
             find . -name ".git" -prune -o -type f -exec chmod 644 {} +
