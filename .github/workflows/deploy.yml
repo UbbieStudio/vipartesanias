@@ -70,10 +70,10 @@ jobs:
             curl -L https://raw.githubusercontent.com/PrestaShop/PrestaShop/8.2.4/composer.json -o composer.json
             curl -L https://raw.githubusercontent.com/PrestaShop/PrestaShop/8.2.4/composer.lock -o composer.lock
 
-            # 4. Install
+            # 4. Install Dependencies
             $PHP_BIN composer.phar install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs --no-security-blocking
 
-            # 5. FULL INDUSTRY-STANDARD DEFINITIONS
+            # 5. ULTIMATE DEFINITIONS (All-in-one Fix)
             cat <<'EOF' > config/defines.inc.php
             <?php
             $currentDir = dirname(__FILE__);
@@ -89,9 +89,11 @@ jobs:
             define('_PS_CUSTOM_CONFIG_FILE_', _PS_CONFIG_DIR_.'settings.inc.php');
             define('_PS_IMG_DIR_', _PS_ROOT_DIR_.'img/');
             define('_PS_MODE_DEV_', false);
+            define('_PS_DEBUG_PROFILING_', false);
+            define('_PS_DISPLAY_COMPATIBILITY_WARNING_', false);
             EOF
 
-            # 6. REFINED AUTOLOADER
+            # 6. AUTOLOAD BRIDGE
             cat <<'EOF' > config/autoload.php
             <?php
             require_once __DIR__ . '/../vendor/autoload.php';
@@ -104,12 +106,12 @@ jobs:
             }
             EOF
 
-            # 7. Heavy Cleanup
+            # 7. Heavy Cleanup & Permissions
             mkdir -p var/cache
             rm -rf var/cache/*
             find . -name ".git" -prune -o -type d -exec chmod 755 {} +
             find . -name ".git" -prune -o -type f -exec chmod 644 {} +
             
-            # 8. Verification
+            # 8. Final Verification
             echo "Running Bootstrap Test..."
             $PHP_BIN -r "require '/var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/config/config.inc.php'; echo 'Full Bootstrap Success';"
