@@ -1,29 +1,22 @@
 {
-    "name": "prestashop/prestashop",
-    "description": "PrestaShop project",
-    "license": "OSL-3.0",
+    "name": "ubbie/vipartesanias-store",
+    "description": "Vipartesanias Store",
     "type": "project",
-    "repositories": [
-        {
-            "type": "composer",
-            "url": "https://packagist.org"
-        }
-    ],
     "require": {
         "php": ">=8.1",
-        "prestashop/prestashop": "8.1.*",
-        "composer/installers": "^1.0 || ^2.0"
+        "composer/installers": "^1.0 || ^2.0",
+        "prestashop/autoloader": "^1.0",
+        "prestashop/composer-registrar": "^1.0"
     },
     "config": {
         "preferred-install": "dist",
-        "prepend-autoloader": false,
-        "platform": {
-            "php": "8.2"
-        },
         "allow-plugins": {
             "composer/installers": true,
             "prestashop/composer-registrar": true,
             "prestashop/composer-installer": true
+        },
+        "platform": {
+            "php": "8.2"
         }
     },
     "autoload": {
@@ -34,6 +27,5 @@
             "app/AppKernel.php",
             "app/AppCache.php"
         ]
-    },
-    "minimum-stability": "stable"
+    }
 }
