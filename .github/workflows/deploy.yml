@@ -48,7 +48,8 @@ jobs:
       - name: Deploy via rsync
         uses: Burnett01/rsync-deployments@7.0.1
         with:
-          switches: -avzr --delete
+          # Changed switches to prevent accidental deletion of server-specific assets
+          switches: -avzr
           path: ./
           remote_path: /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/
           remote_host: 148.251.42.8
@@ -62,19 +63,20 @@ jobs:
           username: ubbie_vipartesanias
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            # 1. Detect PHP Binary (Try Plesk 8.1, then php8.1, then default php)
-            PHP_BIN=$(which php8.1 || which php81 || which php || echo "/usr/bin/php")
-            echo "Using PHP binary: $PHP_BIN"
-
+            cd /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/
+            
+            # 1. Detect PHP binary
+            PHP_BIN=$(which php8.1 || which php81 || which php)
+            
             # 2. Fix Database URLs
             mysql -u vipartes_admin -p'${{ secrets.DB_PASS }}' vipartes_ps -e "UPDATE ps_shop_url SET domain='vipartesanias.ubbie.studio', domain_ssl='vipartesanias.ubbie.studio', physical_uri='/'; UPDATE ps_configuration SET value='vipartesanias.ubbie.studio' WHERE name='PS_SHOP_DOMAIN' OR name='PS_SHOP_DOMAIN_SSL';"
             
-            # 3. Clear Cache
-            rm -rf /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/var/cache/*
-
-            # 4. Rebuild Autoloader using detected PHP
-            cd /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/
+            # 3. Clean environment
+            rm -rf var/cache/*
+            
+            # 4. Force Re-install Composer dependencies ON THE SERVER
+            # This is the most reliable way to ensure the autoloader matches the server filesystem
             $PHP_BIN -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
             $PHP_BIN composer-setup.php
-            $PHP_BIN composer.phar dump-autoload --optimize --no-dev
+            $PHP_BIN composer.phar install --no-dev --optimize-autoloader --ignore-platform-reqs
             rm composer-setup.php composer.phar
