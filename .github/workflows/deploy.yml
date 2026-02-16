@@ -66,14 +66,14 @@ jobs:
             $PHP_BIN composer-setup.php
             rm composer-setup.php
 
-            # 3. Maps
+            # 3. Core Maps
             curl -L https://raw.githubusercontent.com/PrestaShop/PrestaShop/8.2.4/composer.json -o composer.json
             curl -L https://raw.githubusercontent.com/PrestaShop/PrestaShop/8.2.4/composer.lock -o composer.lock
 
             # 4. Install
             $PHP_BIN composer.phar install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs
 
-            # 5. DEFINES.INC.PHP
+            # 5. RE-WRITE DEFINES (Clean)
             cat <<'EOF' > config/defines.inc.php
             <?php
             $currentDir = dirname(__FILE__);
@@ -85,39 +85,35 @@ jobs:
             define('_PS_CACHE_DIR_', _PS_VAR_DIR_.'cache/');
             define('_PS_MODULE_DIR_', _PS_ROOT_DIR_.'modules/');
             define('_PS_TOOL_DIR_', _PS_ROOT_DIR_.'tools/');
-            define('_PS_TRANSLATIONS_DIR_', _PS_ROOT_DIR_.'translations/');
             define('_PS_CUSTOM_CONFIG_FILE_', _PS_CONFIG_DIR_.'settings.inc.php');
             define('_PS_IMG_DIR_', _PS_ROOT_DIR_.'img/');
             define('_PS_MODE_DEV_', false);
-            define('_PS_DEBUG_PROFILING_', false);
-            define('_PS_DISPLAY_COMPATIBILITY_WARNING_', false);
             EOF
 
-            # 6. ENHANCED AUTOLOAD BRIDGE (With Alias Support)
+            # 6. RE-WRITE AUTOLOAD (Standard)
             cat <<'EOF' > config/autoload.php
             <?php
             require_once __DIR__ . '/../vendor/autoload.php';
-            $psAutoloaderFile = __DIR__ . '/../src/PrestaShop/Autoload/PrestashopAutoload.php';
-            if (file_exists($psAutoloaderFile)) {
-                require_once $psAutoloaderFile;
+            if (file_exists(__DIR__ . '/../src/PrestaShop/Autoload/PrestashopAutoload.php')) {
+                require_once __DIR__ . '/../src/PrestaShop/Autoload/PrestashopAutoload.php';
                 \PrestaShop\Autoload\PrestashopAutoload::getInstance()->register();
-            }
-            
-            // Fallback for Core Classes (Legacy Alias)
-            if (!class_exists('Tools', false)) {
-                $toolsPath = __DIR__ . '/../classes/Tools.php';
-                if (file_exists($toolsPath)) {
-                    require_once $toolsPath;
-                    class_alias('ToolsCore', 'Tools');
-                }
             }
             EOF
 
-            # 7. Heavy Cleanup
+            # 7. FORCE CLASS INDEX REGENERATION
+            # This is the "Magic" step to fix "Class Context/Tools not found"
             mkdir -p var/cache/prod
-            rm -rf var/cache/*
+            $PHP_BIN -r "
+                require 'config/defines.inc.php';
+                require 'config/autoload.php';
+                // This triggers the PrestaShop core to scan the classes folder and build the map
+                \PrestaShop\Autoload\PrestashopAutoload::getInstance()->generateIndex();
+                echo 'Class Index Regenerated' . PHP_EOL;
+            "
+
+            # 8. PERMISSIONS
             chmod -R 755 var/cache
             
-            # 8. FINAL VERIFICATION (Bypassing config.inc.php if necessary for the test)
+            # 9. FINAL VERIFICATION
             echo "Running Bootstrap Test..."
-            $PHP_BIN -d display_errors=1 -r "require 'config/autoload.php'; require 'config/config.inc.php'; echo 'Full Bootstrap Success';"
+            $PHP_BIN -d display_errors=1 -r "require 'config/config.inc.php'; if(class_exists('Context')) echo 'Full Bootstrap Success';"
