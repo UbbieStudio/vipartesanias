@@ -57,25 +57,26 @@ jobs:
             export PHP_BIN="/opt/plesk/php/8.2/bin/php"
             cd /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/
             
-            # 1. Update Database
+            # 1. Update Database URL
             mysql -u vipartes_admin -p'${{ secrets.DB_PASS }}' vipartes_ps -e "UPDATE ps_shop_url SET domain='vipartesanias.ubbie.studio', domain_ssl='vipartesanias.ubbie.studio', physical_uri='/'; UPDATE ps_configuration SET value='vipartesanias.ubbie.studio' WHERE name='PS_SHOP_DOMAIN' OR name='PS_SHOP_DOMAIN_SSL';"
             
-            # 2. FIX COMPOSER.JSON (Inject core requirements so Symfony actually downloads)
-            # This ensures the 'vendor' folder actually gets the Symfony Kernel
+            # 2. FORCE RE-LOAD CORE REQUIREMENTS
+            # This injects the actual PrestaShop requirements so Composer downloads Symfony
             $PHP_BIN -r "
               \$json = json_decode(file_get_contents('composer.json'), true);
               \$json['require']['prestashop/prestashop'] = '8.2.*';
               file_put_contents('composer.json', json_encode(\$json, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
             "
 
-            # 3. Re-install everything
+            # 3. Clean and Install EVERYTHING
             rm -f composer.phar
             $PHP_BIN -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
             $PHP_BIN composer-setup.php
             rm -rf vendor composer.lock
+            # This will take a moment as it downloads the actual core files
             $PHP_BIN composer.phar install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs
 
-            # 4. RE-APPLY THE AUTOLOAD BRIDGE
+            # 4. RE-APPLY THE AUTOLOAD BRIDGE (Don't skip this)
             cat <<'EOF' > config/autoload.php
             <?php
             require_once __DIR__ . '/../vendor/autoload.php';
