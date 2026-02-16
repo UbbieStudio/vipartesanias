@@ -40,7 +40,7 @@ jobs:
       - name: Deploy via rsync
         uses: Burnett01/rsync-deployments@7.0.1
         with:
-          # We EXCLUDE vendor here because we will build it fresh on the server
+          # EXCLUDING vendor entirely from rsync. We will build it on the server.
           switches: -avzr --delete --exclude='.git*' --exclude='var/cache/*' --exclude='vendor/*'
           path: ./
           remote_path: /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/
@@ -61,19 +61,21 @@ jobs:
             # 1. Update Database
             mysql -u vipartes_admin -p'${{ secrets.DB_PASS }}' vipartes_ps -e "UPDATE ps_shop_url SET domain='vipartesanias.ubbie.studio', domain_ssl='vipartesanias.ubbie.studio', physical_uri='/'; UPDATE ps_configuration SET value='vipartesanias.ubbie.studio' WHERE name='PS_SHOP_DOMAIN' OR name='PS_SHOP_DOMAIN_SSL';"
             
-            # 2. Build Vendor Folder ON THE SERVER
-            # This guarantees the autoloader uses /var/www/vhosts/... paths
+            # 2. Rebuild Vendor from scratch on the server
+            rm -rf vendor
             if [ ! -f composer.phar ]; then
               $PHP_BIN -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
               $PHP_BIN composer-setup.php
               rm composer-setup.php
             fi
-            
-            # Remove old vendor to ensure no stale files
-            rm -rf vendor
             $PHP_BIN composer.phar install --no-dev --optimize-autoloader --ignore-platform-reqs
             
-            # 3. Clear Cache and fix permissions
+            # 3. Nuke Cache
             rm -rf var/cache/*
+            
+            # 4. Permissions
             find . -type d -exec chmod 755 {} +
             find . -type f -exec chmod 644 {} +
+            
+            # 5. Diagnostic: If this still fails, show us exactly why
+            $PHP_BIN -d display_errors=1 index.php | head -n 5
