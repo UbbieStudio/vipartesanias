@@ -57,7 +57,7 @@ jobs:
             export PHP_BIN="/opt/plesk/php/8.2/bin/php"
             cd /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/
             
-            # 1. Update Database
+            # 1. Database Update
             mysql -u vipartes_admin -p'${{ secrets.DB_PASS }}' vipartes_ps -e "UPDATE ps_shop_url SET domain='vipartesanias.ubbie.studio', domain_ssl='vipartesanias.ubbie.studio', physical_uri='/'; UPDATE ps_configuration SET value='vipartesanias.ubbie.studio' WHERE name='PS_SHOP_DOMAIN' OR name='PS_SHOP_DOMAIN_SSL';"
             
             # 2. Composer
@@ -67,21 +67,24 @@ jobs:
             rm -rf vendor
             $PHP_BIN composer.phar dump-autoload --optimize --no-interaction
 
-            # 3. THE FIX: Create bridge without shell expansion issues
-            cat <<'EOF' > fix_autoload.php
+            # 3. THE "PERMANENT" FIX: Rewrite the core autoload file
+            # This replaces the failing line with a direct path to the file
+            cat <<'EOF' > config/autoload.php
             <?php
-            $path = __DIR__ . '/src/PrestaShop/Autoload/PrestashopAutoload.php';
-            if (file_exists($path)) {
-                require_once $path;
+            require_once __DIR__ . '/../vendor/autoload.php';
+            
+            $internalLoader = __DIR__ . '/../src/PrestaShop/Autoload/PrestashopAutoload.php';
+            if (file_exists($internalLoader)) {
+                require_once $internalLoader;
                 if (!class_exists('PrestaShop\Autoload\PrestashopAutoload') && class_exists('PrestashopAutoload')) {
                     class_alias('PrestashopAutoload', 'PrestaShop\Autoload\PrestashopAutoload');
                 }
             }
-            EOF
             
-            # Inject the fix into config/autoload.php
-            sed -i "/fix_autoload.php/d" config/autoload.php
-            sed -i "2i require_once __DIR__ . '/../fix_autoload.php';" config/autoload.php
+            if (class_exists('PrestaShop\Autoload\PrestashopAutoload')) {
+                PrestaShop\Autoload\PrestashopAutoload::getInstance()->register();
+            }
+            EOF
 
             # 4. Clear Cache and Permissions
             rm -rf var/cache/*
