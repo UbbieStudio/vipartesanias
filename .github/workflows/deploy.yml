@@ -51,3 +51,6 @@ jobs:
           remote_host: 148.251.42.8
           remote_user: ubbie_vipartesanias
           remote_key: ${{ secrets.SERVER_SSH_KEY }}
+          # This next line clears the cache automatically after the files arrive
+          after_deploy: |
+            rm -rf /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/var/cache/*
