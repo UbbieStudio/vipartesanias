@@ -22,11 +22,10 @@ docker-compose.override.yml
 /upload/*
 /download/*
 
-# Assets that should be built or are environment specific
+# Assets
 .env
 .env.test
 /node_modules/
-/vendor/
 
 # OS files
 .DS_Store

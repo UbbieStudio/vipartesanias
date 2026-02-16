@@ -60,26 +60,25 @@ jobs:
             # 1. Database Update
             mysql -u vipartes_admin -p'${{ secrets.DB_PASS }}' vipartes_ps -e "UPDATE ps_shop_url SET domain='vipartesanias.ubbie.studio', domain_ssl='vipartesanias.ubbie.studio', physical_uri='/'; UPDATE ps_configuration SET value='vipartesanias.ubbie.studio' WHERE name='PS_SHOP_DOMAIN' OR name='PS_SHOP_DOMAIN_SSL';"
             
-            # 2. Re-install Composer Binary
+            # 2. Setup Composer Binary
             rm -f composer.phar
             $PHP_BIN -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
             $PHP_BIN composer-setup.php
             rm composer-setup.php
             
-            # 3. Force Vendor Rebuild
+            # 3. Double-check Plugin Permissions on Server
+            $PHP_BIN composer.phar config allow-plugins.composer/installers true --no-interaction
+            $PHP_BIN composer.phar config allow-plugins.prestashop/composer-registrar true --no-interaction
+            $PHP_BIN composer.phar config allow-plugins.prestashop/composer-installer true --no-interaction
+            
+            # 4. Install Dependencies
             rm -rf vendor
             $PHP_BIN composer.phar install --no-dev --optimize-autoloader --ignore-platform-reqs --no-interaction
-            
-            # 4. Critical: Verify vendor exists
-            if [ ! -f vendor/autoload.php ]; then
-              echo "COMPOSER INSTALL FAILED TO CREATE AUTOLOAD.PHP"
-              exit 1
-            fi
             
             # 5. Clear Cache and Permissions
             rm -rf var/cache/*
             find . -type d -exec chmod 755 {} +
             find . -type f -exec chmod 644 {} +
             
-            # 6. Test Bootstrap
+            # 6. Final Bootstrap Test
             $PHP_BIN -r "require 'config/config.inc.php'; echo 'Full Bootstrap Success';"
