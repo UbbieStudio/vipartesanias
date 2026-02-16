@@ -17,7 +17,7 @@ jobs:
         with:
           switches: -avzr --delete
           path: ./
-          remote_path: /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs
+          remote_path: ~/httpdocs/
           remote_host: 148.251.42.8
           remote_user: ubbie_vipartesanias
           remote_key: ${{ secrets.SERVER_SSH_KEY }}
