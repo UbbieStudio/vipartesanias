@@ -57,7 +57,7 @@ jobs:
             export PHP_BIN="/opt/plesk/php/8.2/bin/php"
             cd /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/
             
-            # 1. Update Database URL and Domain
+            # 1. Update Database
             mysql -u vipartes_admin -p'${{ secrets.DB_PASS }}' vipartes_ps -e "UPDATE ps_shop_url SET domain='vipartesanias.ubbie.studio', domain_ssl='vipartesanias.ubbie.studio', physical_uri='/'; UPDATE ps_configuration SET value='vipartesanias.ubbie.studio' WHERE name='PS_SHOP_DOMAIN' OR name='PS_SHOP_DOMAIN_SSL';"
             
             # 2. Setup Composer Binary
@@ -82,6 +82,6 @@ jobs:
             if [ -f "vendor/autoload.php" ]; then
                 $PHP_BIN -r "require 'config/config.inc.php'; echo 'Full Bootstrap Success';"
             else
-                echo "ERROR: vendor/autoload.php was not created. Check composer.json paths."
+                echo "ERROR: vendor/autoload.php was not created."
                 exit 1
             fi

@@ -15,8 +15,10 @@
     },
     "autoload": {
         "psr-4": {
-            "PrestaShop\\": "src/",
-            "PrestaShopBundle\\": "src/PrestaShopBundle/"
+            "PrestaShop\\PrestaShop\\Adapter\\": "src/Adapter/",
+            "PrestaShop\\PrestaShop\\Core\\": "src/Core/",
+            "PrestaShopBundle\\": "src/PrestaShopBundle/",
+            "PrestaShop\\Autoload\\": "src/PrestaShop/Autoload/"
         },
         "classmap": [
             "app/AppKernel.php",
