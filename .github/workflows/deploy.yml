@@ -12,15 +12,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.2'
-          extensions: mbstring, xml, ctype, iconv, intl, gd, zip, pdo_mysql
-
-      - name: Install Dependencies (Local)
-        run: composer install --no-dev --optimize-autoloader --ignore-platform-reqs
-
       - name: Create parameters.yml
         run: |
           mkdir -p app/config
@@ -49,7 +40,8 @@ jobs:
       - name: Deploy via rsync
         uses: Burnett01/rsync-deployments@7.0.1
         with:
-          switches: -avzr --delete --exclude='.git*' --exclude='var/cache/*'
+          # We EXCLUDE vendor here because we will build it fresh on the server
+          switches: -avzr --delete --exclude='.git*' --exclude='var/cache/*' --exclude='vendor/*'
           path: ./
           remote_path: /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/
           remote_host: 148.251.42.8
@@ -69,20 +61,19 @@ jobs:
             # 1. Update Database
             mysql -u vipartes_admin -p'${{ secrets.DB_PASS }}' vipartes_ps -e "UPDATE ps_shop_url SET domain='vipartesanias.ubbie.studio', domain_ssl='vipartesanias.ubbie.studio', physical_uri='/'; UPDATE ps_configuration SET value='vipartesanias.ubbie.studio' WHERE name='PS_SHOP_DOMAIN' OR name='PS_SHOP_DOMAIN_SSL';"
             
-            # 2. Re-generate Autoloader on Server (Crucial for path alignment)
+            # 2. Build Vendor Folder ON THE SERVER
+            # This guarantees the autoloader uses /var/www/vhosts/... paths
             if [ ! -f composer.phar ]; then
               $PHP_BIN -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
               $PHP_BIN composer-setup.php
               rm composer-setup.php
             fi
-            $PHP_BIN composer.phar dump-autoload --optimize --no-dev
             
-            # 3. Nuclear Cache Clear
-            # We move the folder instead of deleting to bypass "file in use" locks
-            mv var/cache var/cache_old_$(date +%s) || true
-            mkdir -p var/cache
-            chmod -R 777 var/cache
+            # Remove old vendor to ensure no stale files
+            rm -rf vendor
+            $PHP_BIN composer.phar install --no-dev --optimize-autoloader --ignore-platform-reqs
             
-            # 4. Final Permissions Check
+            # 3. Clear Cache and fix permissions
+            rm -rf var/cache/*
             find . -type d -exec chmod 755 {} +
             find . -type f -exec chmod 644 {} +
