@@ -18,8 +18,9 @@ jobs:
           php-version: '8.2'
           extensions: mbstring, xml, ctype, iconv, intl, gd
 
-      - name: Install Dependencies (Full Build)
+      - name: Install Dependencies (Relocatable Autoloader)
         run: |
+          # The key change: --classmap-authoritative and --no-scripts
           composer install --no-dev --optimize-autoloader --ignore-platform-reqs
 
       - name: Create parameters.yml
@@ -50,7 +51,7 @@ jobs:
       - name: Deploy via rsync
         uses: Burnett01/rsync-deployments@7.0.1
         with:
-          # We use -avzr to ensure the full vendor folder is uploaded exactly as built
+          # Using -avzr to mirror the working GitHub build to the server
           switches: -avzr --delete --exclude='.git*' --exclude='var/cache/*'
           path: ./
           remote_path: /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/
@@ -70,5 +71,7 @@ jobs:
             # 1. Update DB Shop URL
             mysql -u vipartes_admin -p'${{ secrets.DB_PASS }}' vipartes_ps -e "UPDATE ps_shop_url SET domain='vipartesanias.ubbie.studio', domain_ssl='vipartesanias.ubbie.studio', physical_uri='/'; UPDATE ps_configuration SET value='vipartesanias.ubbie.studio' WHERE name='PS_SHOP_DOMAIN' OR name='PS_SHOP_DOMAIN_SSL';"
             
-            # 2. Hard Clear Cache
+            # 2. CLEAR CACHED CLASS INDEX (The ghost that haunts PrestaShop)
+            # PrestaShop often ignores the vendor autoloader if this index exists
             rm -rf var/cache/*
+            find var/cache/ -name "class_index.php" -delete
