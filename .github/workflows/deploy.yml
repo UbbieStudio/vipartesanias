@@ -60,20 +60,18 @@ jobs:
             # 1. Database Update
             mysql -u vipartes_admin -p'${{ secrets.DB_PASS }}' vipartes_ps -e "UPDATE ps_shop_url SET domain='vipartesanias.ubbie.studio', domain_ssl='vipartesanias.ubbie.studio', physical_uri='/'; UPDATE ps_configuration SET value='vipartesanias.ubbie.studio' WHERE name='PS_SHOP_DOMAIN' OR name='PS_SHOP_DOMAIN_SSL';"
             
-            # 2. Composer
+            # 2. Composer & Maps
             rm -f composer.phar
             $PHP_BIN -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
             $PHP_BIN composer-setup.php
             rm composer-setup.php
-
-            # 3. Maps
             curl -L https://raw.githubusercontent.com/PrestaShop/PrestaShop/8.2.4/composer.json -o composer.json
             curl -L https://raw.githubusercontent.com/PrestaShop/PrestaShop/8.2.4/composer.lock -o composer.lock
 
-            # 4. Install
+            # 3. Install
             $PHP_BIN composer.phar install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs
 
-            # 5. COMPREHENSIVE DEFINES (Fixed _PS_DEBUG_PROFILING_)
+            # 4. COMPREHENSIVE DEFINES
             cat <<'EOF' > config/defines.inc.php
             <?php
             $currentDir = dirname(__FILE__);
@@ -92,18 +90,26 @@ jobs:
             define('_PS_DISPLAY_COMPATIBILITY_WARNING_', false);
             EOF
 
-            # 6. SIMPLIFIED AUTOLOAD (Standard Bridge)
+            # 5. THE CRITICAL AUTOLOAD FIX
+            # This manually registers the PrestaShop core autoloader for legacy classes
             cat <<'EOF' > config/autoload.php
             <?php
             require_once __DIR__ . '/../vendor/autoload.php';
+            
+            // Register the PrestaShop Autoloader manually
+            // This is required to find classes like 'Tools', 'Context', 'Db'
+            $psAutoloader = __DIR__ . '/../src/PrestaShop/Autoload/PrestashopAutoload.php';
+            if (file_exists($psAutoloader)) {
+                require_once $psAutoloader;
+                \PrestaShop\Autoload\PrestashopAutoload::getInstance()->register();
+            }
             EOF
 
-            # 7. Cleanup & Pre-generation
+            # 6. Cleanup & Permissions
             mkdir -p var/cache/prod
             rm -rf var/cache/*
-            chmod -R 755 var/cache
+            chmod -R 777 var/cache
             
-            # 8. VERIFICATION
-            # We don't manually call the autoloader anymore; we let config.inc.php do it
+            # 7. VERIFICATION
             echo "Running Bootstrap Test..."
-            $PHP_BIN -d display_errors=1 -r "require 'config/config.inc.php'; if(class_exists('Context')) echo 'Full Bootstrap Success';"
+            $PHP_BIN -d display_errors=1 -r "require 'config/config.inc.php'; if(class_exists('Tools')) echo 'Full Bootstrap Success';"
