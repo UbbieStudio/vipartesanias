@@ -57,31 +57,31 @@ jobs:
             export PHP_BIN="/opt/plesk/php/8.2/bin/php"
             cd /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/
             
-            # 1. Update Database
+            # 1. Database
             mysql -u vipartes_admin -p'${{ secrets.DB_PASS }}' vipartes_ps -e "UPDATE ps_shop_url SET domain='vipartesanias.ubbie.studio', domain_ssl='vipartesanias.ubbie.studio', physical_uri='/'; UPDATE ps_configuration SET value='vipartesanias.ubbie.studio' WHERE name='PS_SHOP_DOMAIN' OR name='PS_SHOP_DOMAIN_SSL';"
             
-            # 2. Setup Composer
+            # 2. Composer
             rm -f composer.phar
             $PHP_BIN -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
             $PHP_BIN composer-setup.php
             rm composer-setup.php
 
-            # 3. Download Maps
+            # 3. Maps
             curl -L https://raw.githubusercontent.com/PrestaShop/PrestaShop/8.2.4/composer.json -o composer.json
             curl -L https://raw.githubusercontent.com/PrestaShop/PrestaShop/8.2.4/composer.lock -o composer.lock
 
-            # 4. Composer Install
+            # 4. Install
             $PHP_BIN composer.phar install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs --no-security-blocking
 
-            # 5. CREATE MISSING VERSION CONSTANTS
-            # This fixes the "Undefined constant _PS_VERSION_" error
-            cat <<'EOF' > config/settings.inc.php
+            # 5. FORCE DEFINITIONS (The Fix for _PS_VERSION_)
+            # We create config/defines.inc.php which is core to PS loading.
+            cat <<'EOF' > config/defines.inc.php
             <?php
-            define('_PS_VERSION_', '8.2.4');
-            define('_PHP_VERSION_ID_', PHP_VERSION_ID);
+            if (!defined('_PS_VERSION_')) define('_PS_VERSION_', '8.2.4');
+            if (!defined('_PS_MODE_DEV_')) define('_PS_MODE_DEV_', false);
             EOF
 
-            # 6. REFINED AUTOLOAD BRIDGE
+            # 6. REFINED AUTOLOADER
             cat <<'EOF' > config/autoload.php
             <?php
             require_once __DIR__ . '/../vendor/autoload.php';
@@ -94,7 +94,7 @@ jobs:
             }
             EOF
 
-            # 7. Permissions and Cache
+            # 7. Permissions and Heavy Cache Clear
             rm -rf var/cache/*
             find . -name ".git" -prune -o -type d -exec chmod 755 {} +
             find . -name ".git" -prune -o -type f -exec chmod 644 {} +
