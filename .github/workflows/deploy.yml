@@ -15,7 +15,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.1'
+          php-version: '8.2' # Switched to 8.2 to match your server
 
       - name: Install Dependencies (Composer)
         run: composer install --no-dev --optimize-autoloader --ignore-platform-reqs
@@ -48,8 +48,7 @@ jobs:
       - name: Deploy via rsync
         uses: Burnett01/rsync-deployments@7.0.1
         with:
-          # Changed switches to prevent accidental deletion of server-specific assets
-          switches: -avzr
+          switches: -avzr --delete
           path: ./
           remote_path: /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/
           remote_host: 148.251.42.8
@@ -63,20 +62,20 @@ jobs:
           username: ubbie_vipartesanias
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
+            # Set the confirmed path to PHP 8.2
+            export PHP_BIN="/opt/plesk/php/8.2/bin/php"
             cd /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/
             
-            # 1. Detect PHP binary
-            PHP_BIN=$(which php8.1 || which php81 || which php)
-            
-            # 2. Fix Database URLs
+            # 1. Fix Database URLs
             mysql -u vipartes_admin -p'${{ secrets.DB_PASS }}' vipartes_ps -e "UPDATE ps_shop_url SET domain='vipartesanias.ubbie.studio', domain_ssl='vipartesanias.ubbie.studio', physical_uri='/'; UPDATE ps_configuration SET value='vipartesanias.ubbie.studio' WHERE name='PS_SHOP_DOMAIN' OR name='PS_SHOP_DOMAIN_SSL';"
             
-            # 3. Clean environment
+            # 2. Clear Cache
             rm -rf var/cache/*
             
-            # 4. Force Re-install Composer dependencies ON THE SERVER
-            # This is the most reliable way to ensure the autoloader matches the server filesystem
+            # 3. Force rebuild of autoloader using the correct PHP 8.2 binary
             $PHP_BIN -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
             $PHP_BIN composer-setup.php
-            $PHP_BIN composer.phar install --no-dev --optimize-autoloader --ignore-platform-reqs
+            $PHP_BIN composer.phar dump-autoload --optimize --no-dev
+            
+            # Clean up
             rm composer-setup.php composer.phar
