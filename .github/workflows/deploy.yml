@@ -62,15 +62,19 @@ jobs:
           username: ubbie_vipartesanias
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            # 1. Fix Database URLs
+            # 1. Detect PHP Binary (Try Plesk 8.1, then php8.1, then default php)
+            PHP_BIN=$(which php8.1 || which php81 || which php || echo "/usr/bin/php")
+            echo "Using PHP binary: $PHP_BIN"
+
+            # 2. Fix Database URLs
             mysql -u vipartes_admin -p'${{ secrets.DB_PASS }}' vipartes_ps -e "UPDATE ps_shop_url SET domain='vipartesanias.ubbie.studio', domain_ssl='vipartesanias.ubbie.studio', physical_uri='/'; UPDATE ps_configuration SET value='vipartesanias.ubbie.studio' WHERE name='PS_SHOP_DOMAIN' OR name='PS_SHOP_DOMAIN_SSL';"
             
-            # 2. Clear Cache first to remove old mapping
+            # 3. Clear Cache
             rm -rf /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/var/cache/*
 
-            # 3. Use the local composer if available, or try to find it
+            # 4. Rebuild Autoloader using detected PHP
             cd /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/
-            /opt/plesk/php/8.1/bin/php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
-            /opt/plesk/php/8.1/bin/php composer-setup.php
-            /opt/plesk/php/8.1/bin/php composer.phar dump-autoload --optimize --no-dev
+            $PHP_BIN -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
+            $PHP_BIN composer-setup.php
+            $PHP_BIN composer.phar dump-autoload --optimize --no-dev
             rm composer-setup.php composer.phar
