@@ -18,9 +18,8 @@ jobs:
           php-version: '8.2'
           extensions: mbstring, xml, ctype, iconv, intl, gd, zip, pdo_mysql
 
-      - name: Install Dependencies (Local Build)
-        run: |
-          composer install --no-dev --optimize-autoloader --ignore-platform-reqs
+      - name: Install Dependencies (Local)
+        run: composer install --no-dev --optimize-autoloader --ignore-platform-reqs
 
       - name: Create parameters.yml
         run: |
@@ -50,8 +49,6 @@ jobs:
       - name: Deploy via rsync
         uses: Burnett01/rsync-deployments@7.0.1
         with:
-          # We use --delete to ensure the server matches GitHub exactly
-          # We exclude var/cache so we don't upload local temp files
           switches: -avzr --delete --exclude='.git*' --exclude='var/cache/*'
           path: ./
           remote_path: /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/
@@ -66,15 +63,26 @@ jobs:
           username: ubbie_vipartesanias
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
+            export PHP_BIN="/opt/plesk/php/8.2/bin/php"
             cd /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/
             
-            # 1. Update Database URL and Domain
+            # 1. Update Database
             mysql -u vipartes_admin -p'${{ secrets.DB_PASS }}' vipartes_ps -e "UPDATE ps_shop_url SET domain='vipartesanias.ubbie.studio', domain_ssl='vipartesanias.ubbie.studio', physical_uri='/'; UPDATE ps_configuration SET value='vipartesanias.ubbie.studio' WHERE name='PS_SHOP_DOMAIN' OR name='PS_SHOP_DOMAIN_SSL';"
             
-            # 2. The Final Fix: Nuke the entire cache directory
-            # This forces PrestaShop to regenerate the Class Index and find the missing Translator classes
-            rm -rf var/cache/*
+            # 2. Re-generate Autoloader on Server (Crucial for path alignment)
+            if [ ! -f composer.phar ]; then
+              $PHP_BIN -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
+              $PHP_BIN composer-setup.php
+              rm composer-setup.php
+            fi
+            $PHP_BIN composer.phar dump-autoload --optimize --no-dev
             
-            # 3. Ensure permissions are correct for the webserver
+            # 3. Nuclear Cache Clear
+            # We move the folder instead of deleting to bypass "file in use" locks
+            mv var/cache var/cache_old_$(date +%s) || true
+            mkdir -p var/cache
+            chmod -R 777 var/cache
+            
+            # 4. Final Permissions Check
             find . -type d -exec chmod 755 {} +
             find . -type f -exec chmod 644 {} +
