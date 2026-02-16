@@ -57,15 +57,16 @@ jobs:
             export PHP_BIN="/opt/plesk/php/8.2/bin/php"
             cd /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/
             
-            # 1. Update Database
+            # 1. Update Database URL and Domains
             mysql -u vipartes_admin -p'${{ secrets.DB_PASS }}' vipartes_ps -e "UPDATE ps_shop_url SET domain='vipartesanias.ubbie.studio', domain_ssl='vipartesanias.ubbie.studio', physical_uri='/'; UPDATE ps_configuration SET value='vipartesanias.ubbie.studio' WHERE name='PS_SHOP_DOMAIN' OR name='PS_SHOP_DOMAIN_SSL';"
             
-            # 2. Setup Composer
+            # 2. Setup Composer Binary
             rm -f composer.phar
             $PHP_BIN -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
             $PHP_BIN composer-setup.php
+            rm composer-setup.php
 
-            # 3. Nuclear Stability Fix
+            # 3. Fix Stability (Bypass HTMLPurifier dev-master issues)
             $PHP_BIN -r "
               \$json = json_decode(file_get_contents('composer.json'), true);
               \$json['minimum-stability'] = 'dev';
@@ -73,11 +74,12 @@ jobs:
               file_put_contents('composer.json', json_encode(\$json, JSON_PRETTY_PRINT));
             "
 
-            # 4. THE SIMPLEST REQUIRE (No complex flags to break it)
+            # 4. Fetch the Core Dependencies
+            # We use bare require to avoid flag incompatibility loops
             rm -rf vendor composer.lock
-            $PHP_BIN composer.phar require prestashop/prestashop:8.2.* --no-interaction --ignore-platform-reqs --no-security-blocking
+            $PHP_BIN composer.phar require prestashop/prestashop:8.2.* --no-interaction --ignore-platform-reqs
 
-            # 5. Fix Autoload Bridge
+            # 5. Apply the Autoload Bridge
             cat <<'EOF' > config/autoload.php
             <?php
             if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
@@ -95,10 +97,11 @@ jobs:
             }
             EOF
 
-            # 6. Cleanup
+            # 6. Cleanup Cache and Permissions
             rm -rf var/cache/*
             find . -name ".git" -prune -o -type d -exec chmod 755 {} +
             find . -name ".git" -prune -o -type f -exec chmod 644 {} +
             
+            # 7. Verification
             echo "Running Bootstrap Test..."
             $PHP_BIN -r "require 'config/config.inc.php'; echo 'Full Bootstrap Success';"
