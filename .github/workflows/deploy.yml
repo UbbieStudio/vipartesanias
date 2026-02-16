@@ -57,49 +57,51 @@ jobs:
             export PHP_BIN="/opt/plesk/php/8.2/bin/php"
             cd /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/
             
-            # 1. Update Database URL and Domains
+            # 1. Database Configuration Update
             mysql -u vipartes_admin -p'${{ secrets.DB_PASS }}' vipartes_ps -e "UPDATE ps_shop_url SET domain='vipartesanias.ubbie.studio', domain_ssl='vipartesanias.ubbie.studio', physical_uri='/'; UPDATE ps_configuration SET value='vipartesanias.ubbie.studio' WHERE name='PS_SHOP_DOMAIN' OR name='PS_SHOP_DOMAIN_SSL';"
             
-            # 2. Setup Composer Binary
+            # 2. Composer Setup
             rm -f composer.phar
             $PHP_BIN -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
             $PHP_BIN composer-setup.php
             rm composer-setup.php
 
-            # 3. DOWNLOAD OFFICIAL DEPENDENCY MAP
-            # This is the "Magic Bullet": It gets the exact version list for PrestaShop 8.2.4
-            # so Composer doesn't have to calculate anything.
+            # 3. Download Official 8.2.4 Dependency Map
             curl -L https://raw.githubusercontent.com/PrestaShop/PrestaShop/8.2.4/composer.json -o composer.json
             curl -L https://raw.githubusercontent.com/PrestaShop/PrestaShop/8.2.4/composer.lock -o composer.lock
 
-            # 4. INSTALL FROM LOCK
-            # Using --no-security-blocking to handle the older packages in PS 8.2
-            rm -rf vendor
+            # 4. Final Core Installation
+            # The vendor folder already exists from the last run, but this ensures integrity
             $PHP_BIN composer.phar install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs --no-security-blocking
 
-            # 5. Apply the Autoload Bridge
+            # 5. FIXED Autoload Bridge (Resolves the Singleton TypeError)
             cat <<'EOF' > config/autoload.php
             <?php
+            // 1. Standard Composer Autoloader
             if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
                 require_once __DIR__ . '/../vendor/autoload.php';
             }
-            $internalLoader = __DIR__ . '/../src/PrestaShop/Autoload/PrestashopAutoload.php';
-            if (file_exists($internalLoader)) {
-                require_once $internalLoader;
-                if (!class_exists('PrestaShop\Autoload\PrestashopAutoload') && class_exists('PrestashopAutoload')) {
-                    class_alias('PrestashopAutoload', 'PrestaShop\Autoload\PrestashopAutoload');
+
+            // 2. PrestaShop Legacy Autoloader
+            $psAutoloader = __DIR__ . '/../src/PrestaShop/Autoload/PrestashopAutoload.php';
+            if (file_exists($psAutoloader)) {
+                require_once $psAutoloader;
+                
+                // Use the class mapping that PrestaShop expects
+                if (class_exists('PrestashopAutoload')) {
+                    if (!class_exists('PrestaShop\Autoload\PrestashopAutoload')) {
+                        class_alias('PrestashopAutoload', 'PrestaShop\Autoload\PrestashopAutoload');
+                    }
+                    PrestashopAutoload::getInstance()->register();
                 }
-            }
-            if (class_exists('PrestaShop\Autoload\PrestashopAutoload')) {
-                PrestaShop\Autoload\PrestashopAutoload::getInstance()->register();
             }
             EOF
 
-            # 6. Cleanup Cache and Permissions
+            # 6. Permissions and Cache Flush
             rm -rf var/cache/*
             find . -name ".git" -prune -o -type d -exec chmod 755 {} +
             find . -name ".git" -prune -o -type f -exec chmod 644 {} +
             
-            # 7. Final Verification
+            # 7. Verification Test
             echo "Running Bootstrap Test..."
             $PHP_BIN -r "require 'config/config.inc.php'; echo 'Full Bootstrap Success';"
