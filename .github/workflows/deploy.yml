@@ -57,7 +57,7 @@ jobs:
             export PHP_BIN="/opt/plesk/php/8.2/bin/php"
             cd /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/
             
-            # 1. Update Database
+            # 1. Database Update
             mysql -u vipartes_admin -p'${{ secrets.DB_PASS }}' vipartes_ps -e "UPDATE ps_shop_url SET domain='vipartesanias.ubbie.studio', domain_ssl='vipartesanias.ubbie.studio', physical_uri='/'; UPDATE ps_configuration SET value='vipartesanias.ubbie.studio' WHERE name='PS_SHOP_DOMAIN' OR name='PS_SHOP_DOMAIN_SSL';"
             
             # 2. Composer
@@ -66,18 +66,18 @@ jobs:
             $PHP_BIN composer-setup.php
             rm composer-setup.php
 
-            # 3. Core Maps
+            # 3. Maps
             curl -L https://raw.githubusercontent.com/PrestaShop/PrestaShop/8.2.4/composer.json -o composer.json
             curl -L https://raw.githubusercontent.com/PrestaShop/PrestaShop/8.2.4/composer.lock -o composer.lock
 
             # 4. Install
             $PHP_BIN composer.phar install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs
 
-            # 5. RE-WRITE DEFINES (Clean)
+            # 5. COMPREHENSIVE DEFINES (Fixed _PS_DEBUG_PROFILING_)
             cat <<'EOF' > config/defines.inc.php
             <?php
             $currentDir = dirname(__FILE__);
-            if (!defined('_PS_VERSION_')) define('_PS_VERSION_', '8.2.4');
+            define('_PS_VERSION_', '8.2.4');
             define('_PS_CONFIG_DIR_', $currentDir.'/');
             define('_PS_ROOT_DIR_', realpath($currentDir.'/..').'/');
             define('_PS_CORE_DIR_', _PS_ROOT_DIR_);
@@ -88,32 +88,22 @@ jobs:
             define('_PS_CUSTOM_CONFIG_FILE_', _PS_CONFIG_DIR_.'settings.inc.php');
             define('_PS_IMG_DIR_', _PS_ROOT_DIR_.'img/');
             define('_PS_MODE_DEV_', false);
+            define('_PS_DEBUG_PROFILING_', false);
+            define('_PS_DISPLAY_COMPATIBILITY_WARNING_', false);
             EOF
 
-            # 6. RE-WRITE AUTOLOAD (Standard)
+            # 6. SIMPLIFIED AUTOLOAD (Standard Bridge)
             cat <<'EOF' > config/autoload.php
             <?php
             require_once __DIR__ . '/../vendor/autoload.php';
-            if (file_exists(__DIR__ . '/../src/PrestaShop/Autoload/PrestashopAutoload.php')) {
-                require_once __DIR__ . '/../src/PrestaShop/Autoload/PrestashopAutoload.php';
-                \PrestaShop\Autoload\PrestashopAutoload::getInstance()->register();
-            }
             EOF
 
-            # 7. FORCE CLASS INDEX REGENERATION
-            # This is the "Magic" step to fix "Class Context/Tools not found"
+            # 7. Cleanup & Pre-generation
             mkdir -p var/cache/prod
-            $PHP_BIN -r "
-                require 'config/defines.inc.php';
-                require 'config/autoload.php';
-                // This triggers the PrestaShop core to scan the classes folder and build the map
-                \PrestaShop\Autoload\PrestashopAutoload::getInstance()->generateIndex();
-                echo 'Class Index Regenerated' . PHP_EOL;
-            "
-
-            # 8. PERMISSIONS
+            rm -rf var/cache/*
             chmod -R 755 var/cache
             
-            # 9. FINAL VERIFICATION
+            # 8. VERIFICATION
+            # We don't manually call the autoloader anymore; we let config.inc.php do it
             echo "Running Bootstrap Test..."
             $PHP_BIN -d display_errors=1 -r "require 'config/config.inc.php'; if(class_exists('Context')) echo 'Full Bootstrap Success';"
