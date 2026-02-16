@@ -69,59 +69,48 @@ jobs:
             curl -L https://raw.githubusercontent.com/PrestaShop/PrestaShop/8.2.4/composer.lock -o composer.lock
             $PHP_BIN composer.phar install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs
 
-            # 3. Verify Directory Integrity (Diagnostic)
-            echo "Checking for core files..."
-            ls -d classes/ src/ config/ vendor/ || echo "WARNING: CORE DIRECTORIES MISSING"
-
-            # 4. DEFINES
+            # 3. OVERRIDE DEFINES.INC.PHP (The Master Fix)
+            # This forces PHP to find the core classes by their real names
             cat <<'EOF' > config/defines.inc.php
             <?php
             $currentDir = dirname(__FILE__);
             define('_PS_VERSION_', '8.2.4');
-            define('_PS_CONFIG_DIR_', $currentDir.'/');
             define('_PS_ROOT_DIR_', realpath($currentDir.'/..').'/');
-            define('_PS_CORE_DIR_', _PS_ROOT_DIR_);
+            define('_PS_CLASS_DIR_', _PS_ROOT_DIR_.'classes/');
+            
+            // Critical: Force load the absolute most important classes
+            require_once(_PS_CLASS_DIR_.'Tools.php');
+            require_once(_PS_CLASS_DIR_.'Context.php');
+            require_once(_PS_CLASS_DIR_.'db/Db.php');
+            require_once(_PS_CLASS_DIR_.'Configuration.php');
+            require_once(_PS_CLASS_DIR_.'Shop.php');
+            
+            // Manually Create Aliases
+            if (!class_exists('Tools')) class_alias('ToolsCore', 'Tools');
+            if (!class_exists('Context')) class_alias('ContextCore', 'Context');
+            if (!class_exists('Db')) class_alias('DbCore', 'Db');
+            if (!class_exists('Configuration')) class_alias('ConfigurationCore', 'Configuration');
+            
+            define('_PS_CONFIG_DIR_', _PS_ROOT_DIR_.'config/');
             define('_PS_VAR_DIR_', _PS_ROOT_DIR_.'var/');
             define('_PS_CACHE_DIR_', _PS_VAR_DIR_.'cache/');
             define('_PS_MODULE_DIR_', _PS_ROOT_DIR_.'modules/');
-            define('_PS_TOOL_DIR_', _PS_ROOT_DIR_.'tools/');
-            define('_PS_CUSTOM_CONFIG_FILE_', _PS_CONFIG_DIR_.'settings.inc.php');
-            define('_PS_IMG_DIR_', _PS_ROOT_DIR_.'img/');
             define('_PS_MODE_DEV_', false);
             define('_PS_DEBUG_PROFILING_', false);
             define('_PS_DISPLAY_COMPATIBILITY_WARNING_', false);
             EOF
 
-            # 5. HARDCODED ALIAS BRIDGE
-            # If the autoloader fails, we manually point to the core files.
+            # 4. Standard Autoload
             cat <<'EOF' > config/autoload.php
             <?php
             require_once __DIR__ . '/../vendor/autoload.php';
-            
-            spl_autoload_register(function ($class) {
-                $file = __DIR__ . '/../classes/' . $class . '.php';
-                if (file_exists($file)) {
-                    require_once $file;
-                }
-                // PrestaShop 8 standard
-                $coreFile = __DIR__ . '/../classes/' . str_replace('Core', '', $class) . '.php';
-                if (str_ends_with($class, 'Core') && file_exists($coreFile)) {
-                   require_once $coreFile;
-                }
-            }, true, true);
-
-            // Force Alias for Tools
-            if (!class_exists('Tools')) {
-                require_once __DIR__ . '/../classes/Tools.php';
-                class_alias('ToolsCore', 'Tools');
-            }
             EOF
 
-            # 6. Cleanup
+            # 5. Cleanup
             mkdir -p var/cache/prod
             rm -rf var/cache/*
             chmod -R 775 var/cache
             
-            # 7. VERIFICATION
+            # 6. VERIFICATION
             echo "Running Bootstrap Test..."
-            $PHP_BIN -d display_errors=1 -r "require 'config/autoload.php'; require 'config/config.inc.php'; if(class_exists('Tools')) echo 'Full Bootstrap Success';"
+            $PHP_BIN -d display_errors=1 -r "require 'config/config.inc.php'; if(class_exists('Context')) echo 'Full Bootstrap Success';"
