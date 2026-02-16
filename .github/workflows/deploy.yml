@@ -57,18 +57,17 @@ jobs:
             export PHP_BIN="/opt/plesk/php/8.2/bin/php"
             cd /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/
             
-            # 1. Database Update
+            # 1. Update Database
             mysql -u vipartes_admin -p'${{ secrets.DB_PASS }}' vipartes_ps -e "UPDATE ps_shop_url SET domain='vipartesanias.ubbie.studio', domain_ssl='vipartesanias.ubbie.studio', physical_uri='/'; UPDATE ps_configuration SET value='vipartesanias.ubbie.studio' WHERE name='PS_SHOP_DOMAIN' OR name='PS_SHOP_DOMAIN_SSL';"
             
-            # 2. Composer
+            # 2. Install Composer dependencies (The missing piece)
             rm -f composer.phar
             $PHP_BIN -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
             $PHP_BIN composer-setup.php
             rm -rf vendor
-            $PHP_BIN composer.phar dump-autoload --optimize --no-interaction
+            $PHP_BIN composer.phar install --no-dev --optimize-autoloader --no-interaction
 
-            # 3. THE "PERMANENT" FIX: Rewrite the core autoload file
-            # This replaces the failing line with a direct path to the file
+            # 3. THE "PERMANENT" FIX: (Keep this, it's working)
             cat <<'EOF' > config/autoload.php
             <?php
             require_once __DIR__ . '/../vendor/autoload.php';
