@@ -67,15 +67,14 @@ jobs:
             rm composer-setup.php
             
             # 3. Generate Optimized Autoloader
-            # We clear the vendor folder to ensure no stale files block the dump
             rm -rf vendor
             mkdir -p vendor
             $PHP_BIN composer.phar dump-autoload --optimize --no-interaction
             
-            # 4. Clear Cache and Fix Permissions
+            # 4. Permissions (Skipping .git) and Cache
             rm -rf var/cache/*
-            find . -type d -exec chmod 755 {} +
-            find . -type f -exec chmod 644 {} +
+            find . -name ".git" -prune -o -type d -exec chmod 755 {} +
+            find . -name ".git" -prune -o -type f -exec chmod 644 {} +
             
             # 5. Final Bootstrap Test
             echo "Running Bootstrap Test..."
