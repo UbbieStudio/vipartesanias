@@ -57,29 +57,32 @@ jobs:
             export PHP_BIN="/opt/plesk/php/8.2/bin/php"
             cd /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/
             
-            # 1. Update Database URL
+            # 1. Database Update
             mysql -u vipartes_admin -p'${{ secrets.DB_PASS }}' vipartes_ps -e "UPDATE ps_shop_url SET domain='vipartesanias.ubbie.studio', domain_ssl='vipartesanias.ubbie.studio', physical_uri='/'; UPDATE ps_configuration SET value='vipartesanias.ubbie.studio' WHERE name='PS_SHOP_DOMAIN' OR name='PS_SHOP_DOMAIN_SSL';"
             
-            # 2. Re-initialize Composer
+            # 2. Composer Force-Generate
             rm -f composer.phar
             $PHP_BIN -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
             $PHP_BIN composer-setup.php
-            rm composer-setup.php
             rm -rf vendor
-            mkdir -p vendor
             $PHP_BIN composer.phar dump-autoload --optimize --no-interaction
 
-            # 3. EMERGENCY BYPASS: Force load the missing Autoload class
-            # This searches for the file and injects a hard require into the PrestaShop bootstrap
-            FILE_PATH=$(find src -name PrestashopAutoload.php | head -n 1)
-            if [ ! -z "$FILE_PATH" ]; then
-                echo "Injecting $FILE_PATH into config/autoload.php"
-                # Remove any previous injection to avoid duplicates
-                sed -i "/PrestashopAutoload.php/d" config/autoload.php
-                # Insert the require_once on the second line of the file
-                sed -i "2i require_once __DIR__ . '/../$FILE_PATH';" config/autoload.php
-            fi
+            # 3. THE "GORDON RAMSAY" FIX
+            # Instead of just requiring the file, we inject a script that handles the class mapping manually
+            cat <<'EOF' > fix_autoload.php
+            <?php
+            \$path = shell_exec('find src -name PrestashopAutoload.php | head -n 1');
+            if (\$path) {
+                require_once trim(\$path);
+                if (!class_exists('PrestaShop\Autoload\PrestashopAutoload') && class_exists('PrestashopAutoload')) {
+                    class_alias('PrestashopAutoload', 'PrestaShop\Autoload\PrestashopAutoload');
+                }
+            }
+            EOF
             
+            # Inject our fix into the very top of config/autoload.php
+            sed -i "2i require_once __DIR__ . '/../fix_autoload.php';" config/autoload.php
+
             # 4. Permissions and Cache
             rm -rf var/cache/*
             find . -name ".git" -prune -o -type d -exec chmod 755 {} +
