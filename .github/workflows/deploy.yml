@@ -60,12 +60,12 @@ jobs:
             # 1. Update Database
             mysql -u vipartes_admin -p'${{ secrets.DB_PASS }}' vipartes_ps -e "UPDATE ps_shop_url SET domain='vipartesanias.ubbie.studio', domain_ssl='vipartesanias.ubbie.studio', physical_uri='/'; UPDATE ps_configuration SET value='vipartesanias.ubbie.studio' WHERE name='PS_SHOP_DOMAIN' OR name='PS_SHOP_DOMAIN_SSL';"
             
-            # 2. Re-setup Composer
+            # 2. Setup Composer
             rm -f composer.phar
             $PHP_BIN -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
             $PHP_BIN composer-setup.php
-            
-            # 3. FORCE MINIMUM STABILITY (The Fix for HTMLPurifier)
+
+            # 3. Nuclear Stability Fix
             $PHP_BIN -r "
               \$json = json_decode(file_get_contents('composer.json'), true);
               \$json['minimum-stability'] = 'dev';
@@ -73,9 +73,9 @@ jobs:
               file_put_contents('composer.json', json_encode(\$json, JSON_PRETTY_PRINT));
             "
 
-            # 4. Use REQUIRE instead of INSTALL to force dependency resolution
+            # 4. THE SIMPLEST REQUIRE (No complex flags to break it)
             rm -rf vendor composer.lock
-            $PHP_BIN composer.phar require prestashop/prestashop:8.2.* --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs --no-security-blocking
+            $PHP_BIN composer.phar require prestashop/prestashop:8.2.* --no-interaction --ignore-platform-reqs --no-security-blocking
 
             # 5. Fix Autoload Bridge
             cat <<'EOF' > config/autoload.php
@@ -95,7 +95,7 @@ jobs:
             }
             EOF
 
-            # 6. Final cleanup
+            # 6. Cleanup
             rm -rf var/cache/*
             find . -name ".git" -prune -o -type d -exec chmod 755 {} +
             find . -name ".git" -prune -o -type f -exec chmod 644 {} +
