@@ -42,15 +42,23 @@ jobs:
           echo "    cookie_iv: ${{ secrets.PS_COOKIE_IV }}" >> app/config/parameters.yml
           echo "    new_cookie_key: ${{ secrets.PS_NEW_COOKIE_KEY }}" >> app/config/parameters.yml
 
+      - name: Prepare for Rsync
+        run: rm -f .gitignore
+
       - name: Deploy via rsync
         uses: Burnett01/rsync-deployments@7.0.1
         with:
-          # Added --no-ignore to prevent rsync from skipping the vendor folder
-          switches: -avzr --delete --no-ignore
+          switches: -avzr --delete
           path: ./
           remote_path: /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/
           remote_host: 148.251.42.8
           remote_user: ubbie_vipartesanias
           remote_key: ${{ secrets.SERVER_SSH_KEY }}
-          after_deploy: |
-            rm -rf /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/var/cache/*
+
+      - name: Clear Cache on Server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 148.251.42.8
+          username: ubbie_vipartesanias
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: rm -rf /var/www/vhosts/vipartesanias.ubbie.studio/httpdocs/var/cache/*
