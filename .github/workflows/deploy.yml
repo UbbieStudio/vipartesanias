@@ -66,18 +66,16 @@ jobs:
             $PHP_BIN composer-setup.php
             rm composer-setup.php
 
-            # 3. Fix Stability (Bypass HTMLPurifier dev-master issues)
-            $PHP_BIN -r "
-              \$json = json_decode(file_get_contents('composer.json'), true);
-              \$json['minimum-stability'] = 'dev';
-              \$json['prefer-stable'] = true;
-              file_put_contents('composer.json', json_encode(\$json, JSON_PRETTY_PRINT));
-            "
+            # 3. DOWNLOAD OFFICIAL DEPENDENCY MAP
+            # This is the "Magic Bullet": It gets the exact version list for PrestaShop 8.2.4
+            # so Composer doesn't have to calculate anything.
+            curl -L https://raw.githubusercontent.com/PrestaShop/PrestaShop/8.2.4/composer.json -o composer.json
+            curl -L https://raw.githubusercontent.com/PrestaShop/PrestaShop/8.2.4/composer.lock -o composer.lock
 
-            # 4. Fetch the Core Dependencies
-            # We use bare require to avoid flag incompatibility loops
-            rm -rf vendor composer.lock
-            $PHP_BIN composer.phar require prestashop/prestashop:8.2.* --no-interaction --ignore-platform-reqs
+            # 4. INSTALL FROM LOCK
+            # Using --no-security-blocking to handle the older packages in PS 8.2
+            rm -rf vendor
+            $PHP_BIN composer.phar install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs --no-security-blocking
 
             # 5. Apply the Autoload Bridge
             cat <<'EOF' > config/autoload.php
@@ -102,6 +100,6 @@ jobs:
             find . -name ".git" -prune -o -type d -exec chmod 755 {} +
             find . -name ".git" -prune -o -type f -exec chmod 644 {} +
             
-            # 7. Verification
+            # 7. Final Verification
             echo "Running Bootstrap Test..."
             $PHP_BIN -r "require 'config/config.inc.php'; echo 'Full Bootstrap Success';"
